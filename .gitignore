@@ -1,0 +1,11 @@
+CLAUDE.md
+.research_files
+.testdata
+__pycache__
+.mypy_cache
+.pytest_cache
+*.pyc
+*.bak
+config.yaml
+ANUSTIMES.md
+test.log

@@ -1,0 +1,63 @@
+# HybridS3 configuration
+# Buckets are defined here and ONLY here — no API create/delete.
+# Change config + restart to add/remove buckets.
+
+# Cross-bucket god key. Works on every bucket for every operation.
+# Only credential that can list all buckets. Keep secret.
+master_key: "change-me-to-something-secret"
+
+# Non-secret identifier paired with master_key in S3 auth (aws_access_key_id).
+# Safe to share — it grants nothing without the master_key.
+master_public_key: "master"
+
+# How often the background loop runs to delete expired objects and orphan files.
+# Accepts human-readable durations: 30s, 5m, 1h, or raw seconds: 60
+cleanup_interval: 1m
+
+# How long a request may wait to acquire a lock on an object before giving up with 503.
+# Accepts seconds as a float. Applies per object key, globally across all buckets.
+lock_acquire_timeout: 30
+
+# How long a request may hold a lock before it is forcibly released and the request gets 503.
+# Protects against slow or stalled uploads blocking writes on the same key indefinitely.
+lock_hold_timeout: 300
+
+# Maximum number of requests that may queue for the same object key at once.
+# Once the queue is full, new requests are rejected immediately with 503.
+lock_max_waiters: 100
+
+# TTL formats:   30s  5m  1h  1h30m12s  1d  2d12h  0 (never expire)
+# Size formats:  500B  50KB  10MB  1GB  0 (no limit)
+
+buckets:
+  uploads:
+    # true  — anyone can read (GET/HEAD/LIST) without authentication
+    # false — authentication required for all operations
+    public: true
+
+    # Private key for this bucket.
+    # Used as the Bearer token value and as aws_secret_access_key in S3 auth.
+    # Never transmitted — only used to sign or verify request signatures.
+    # Keep secret.
+    key: "uploads-secret"
+
+    # Public identifier for this bucket in S3 auth (aws_access_key_id).
+    # Also appears in presigned URL Credential= fields.
+    # Safe to share — it identifies the bucket but grants no access.
+    # Defaults to the bucket name if not set.
+    public_key: "uploads-id"
+
+    # Objects expire this long after their last write. Overwriting resets the clock.
+    # 0 means objects never expire.
+    ttl: 24h
+
+    # Maximum upload size. Requests over this limit are rejected with 413.
+    # 0 means no limit.
+    max_file_size: 50MB
+
+  permanent:
+    public: false
+    key: "perm-secret"
+    public_key: "permanent-id"
+    ttl: 0
+    max_file_size: 100MB

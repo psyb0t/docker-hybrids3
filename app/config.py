@@ -33,6 +33,7 @@ class AppConfig:
     lock_acquire_timeout: float   # seconds to wait for a lock before 503
     lock_hold_timeout: float      # seconds a lock may be held before 503
     lock_max_waiters: int         # max queued requests per key before 503
+    path_prefix: str              # e.g. "/storage" — serve all routes under this prefix
     buckets: dict[str, BucketConfig]
 
     def find_by_public_key(self, public_key: str) -> BucketConfig | None:
@@ -118,6 +119,10 @@ def load_config(path: str) -> AppConfig:
         log.error("No buckets configured")
         sys.exit(1)
 
+    raw_prefix = str(raw.get("path_prefix", "")).strip()
+    # normalize: "/storage/" or "/storage" → "/storage"; "" or "/" → ""
+    path_prefix = "/" + raw_prefix.strip("/") if raw_prefix.strip("/") else ""
+
     return AppConfig(
         master_key=raw.get("master_key", ""),
         master_public_key=raw.get("master_public_key", "master"),
@@ -125,5 +130,6 @@ def load_config(path: str) -> AppConfig:
         lock_acquire_timeout=float(raw.get("lock_acquire_timeout", 30)),
         lock_hold_timeout=float(raw.get("lock_hold_timeout", 300)),
         lock_max_waiters=int(raw.get("lock_max_waiters", 100)),
+        path_prefix=path_prefix,
         buckets=buckets,
     )

@@ -165,10 +165,18 @@ async def presign(request: Request, bucket: str, key: str) -> Response:
         return auth_err
 
     base = str(request.base_url).rstrip("/")
+    prefix = request.scope.get("_original_path", "")
+    # extract prefix: original=/storage/presign/bucket/key → prefix=/storage
+    # stripped path is /presign/bucket/key, so prefix = original minus stripped
+    stripped = request.url.path  # /presign/bucket/key
+    if prefix and prefix.endswith(stripped):
+        prefix = prefix[: -len(stripped)]
+    else:
+        prefix = ""
 
     # public buckets: plain URL — no signature needed since GET is open
     if bc.public:
-        url = f"{base}/{bucket}/{key}"
+        url = f"{base}{prefix}/{bucket}/{key}"
         log.info("presign", extra={"bucket": bucket, "key": key, "public": True})
         return JSONResponse({"url": url, "expires": None})
 
@@ -187,6 +195,7 @@ async def presign(request: Request, bucket: str, key: str) -> Response:
         secret_key=bc.key,
         expires=expires,
         host=host,
+        prefix=prefix,
     )
 
     log.info("presign", extra={"bucket": bucket, "key": key, "expires": expires})

@@ -121,6 +121,7 @@ cleanup_interval: 3
 lock_acquire_timeout: 0.5
 lock_hold_timeout: 2
 lock_max_waiters: 15
+path_prefix: ""
 
 buckets:
   public-bucket:

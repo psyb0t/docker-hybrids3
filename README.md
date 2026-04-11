@@ -44,7 +44,7 @@ Lightweight object storage that speaks S3 (boto3/AWS SDK compatible), plain HTTP
 
 **Most self-hosted S3-compatible storage is designed for large-scale deployments.** Distributed erasure coding, IAM policies, WORM compliance, full web consoles — useful if you're running a cloud, overkill if you just want a place to put files that various services and AI agents can read and write.
 
-**AWS Sig V4 breaks behind reverse proxy path prefixes.** Most implementations verify signatures using the full original upstream path. Put them behind nginx at `/storage/`, nginx strips the prefix, the server sees `/bucket/key` instead of `/storage/bucket/key`, the signature check fails. HybridS3 verifies signatures using the path as received — no special proxy headers required, works behind any prefix.
+**AWS Sig V4 breaks behind reverse proxy path prefixes.** Most implementations verify signatures using the full original upstream path. Put them behind nginx at `/storage/`, nginx strips the prefix, the server sees `/bucket/key` instead of `/storage/bucket/key`, the signature check fails. HybridS3 has a `path_prefix` config option — set it to `/storage` and all routes move under that prefix. No path stripping, no special proxy headers. boto3's signed path matches what the server sees.
 
 **Three interfaces, one service.** boto3 works out of the box. Plain HTTP with `curl` works. AI agents connect via MCP and get structured tool definitions. No separate services for different clients.
 
@@ -143,6 +143,12 @@ lock_hold_timeout: 300
 # Maximum number of requests that may queue for the same object key at once.
 # Once the queue is full, new requests are rejected immediately with 503.
 lock_max_waiters: 100
+
+# Serve all routes under this path prefix.
+# Set this when running behind a reverse proxy at a subpath (e.g. /storage).
+# Accepts "/storage" or "/storage/" — both are normalized.
+# Leave empty or omit to serve at the root.
+# path_prefix: /storage
 
 # TTL formats:   30s  5m  1h  1h30m12s  1d  2d12h  0 (never expire)
 # Size formats:  500B  50KB  10MB  1GB  0 (no limit)
@@ -552,18 +558,24 @@ The request ID appears in every log line produced during a request, making it ea
 
 ## Behind a Reverse Proxy
 
-AWS Sig V4 signatures are verified against the path as received by HybridS3. A proxy stripping a path prefix before forwarding will not break signature verification.
+Set `path_prefix` in config to match the proxy location. HybridS3 serves all routes under that prefix natively — nginx forwards the path as-is, no stripping required. SigV4 signatures work because the client's signed path matches what the server sees.
+
+```yaml
+# config.yaml
+path_prefix: /storage
+```
 
 ```nginx
-location /storage/ {
-    proxy_pass http://hybrids3:8080/;
+# nginx — just forward, no trailing-slash trick, no special headers
+location /storage {
+    proxy_pass http://hybrids3:8080;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
 }
 ```
 
-With this config: boto3 at `http://yourdomain/storage/`, MCP at `http://yourdomain/storage/mcp/`.
+With this config: boto3 at `http://yourdomain/storage`, curl at `http://yourdomain/storage/bucket/key`, MCP at `http://yourdomain/storage/mcp/`.
 
 ---
 

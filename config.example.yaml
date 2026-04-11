@@ -26,6 +26,12 @@ lock_hold_timeout: 300
 # Once the queue is full, new requests are rejected immediately with 503.
 lock_max_waiters: 100
 
+# Serve all routes under this path prefix.
+# Set this when running behind a reverse proxy at a subpath (e.g. /storage).
+# Accepts "/storage" or "/storage/" — both normalized to "/storage".
+# Leave empty or omit to serve at the root.
+# path_prefix: /storage
+
 # TTL formats:   30s  5m  1h  1h30m12s  1d  2d12h  0 (never expire)
 # Size formats:  500B  50KB  10MB  1GB  0 (no limit)
 

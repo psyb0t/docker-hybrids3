@@ -56,14 +56,15 @@ async def _app_lifespan(app: FastAPI):
     routes.db_conn = conn
     routes.lock_manager = locks
 
-    global _app_config
+    global _app_config, _path_prefix
     _app_config = cfg
+    _path_prefix = cfg.path_prefix
 
     if _mcp_available:
         import mcp_server
 
         mcp_server.init(cfg, conn, locks)
-        log.info("MCP server mounted at /mcp")
+        log.info("MCP server mounted", extra={"path": f"{cfg.path_prefix}/mcp"})
 
     task = asyncio.create_task(cleanup_loop(cfg, conn))
 
@@ -94,6 +95,7 @@ async def _app_lifespan(app: FastAPI):
 
 # set during lifespan from config
 _app_config = None
+_path_prefix = ""
 
 
 def _valid_mcp_token(token: str) -> bool:
@@ -107,6 +109,35 @@ def _valid_mcp_token(token: str) -> bool:
         if hmac.compare_digest(token, bc.key):
             return True
     return False
+
+
+class PathPrefixMiddleware(BaseHTTPMiddleware):
+    """Strip path_prefix from incoming requests for routing, preserve original for SigV4.
+
+    Handles both /storage and /storage/ — boto3 sends without trailing slash
+    for service-level ops (list_buckets), with slash for everything else.
+    Reads prefix from the global _path_prefix set during lifespan.
+    """
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        prefix = _path_prefix
+        if not prefix:
+            return await call_next(request)
+
+        path = request.scope["path"]
+
+        if path == prefix:
+            request.scope["_original_path"] = path
+            request.scope["path"] = "/"
+            return await call_next(request)
+
+        if path.startswith(prefix + "/"):
+            request.scope["_original_path"] = path
+            request.scope["path"] = path[len(prefix):]
+            return await call_next(request)
+
+        from starlette.responses import Response as StarletteResponse
+        return StarletteResponse(status_code=404)
 
 
 class McpAuthMiddleware(BaseHTTPMiddleware):
@@ -152,6 +183,7 @@ else:
     if not _mcp_available:
         log.warning("fastmcp not installed — MCP server disabled")
 
+app.add_middleware(PathPrefixMiddleware)
 app.add_middleware(McpAuthMiddleware)
 app.add_middleware(RequestIdMiddleware)
 app.include_router(routes.router)

@@ -361,6 +361,7 @@ async def presign_url(
         host: Hostname for the URL (derived from base_url if empty).
     """
     from sigv4 import generate_presigned_url
+    from urllib.parse import urlparse
 
     err = _check_bucket(bucket)
     if err:
@@ -370,21 +371,27 @@ async def presign_url(
 
     bc = _config.buckets[bucket]
 
+    # extract prefix from base_url path (e.g. http://host:4000/storage → prefix=/storage)
+    parsed = urlparse(base_url)
+    prefix = parsed.path.rstrip("/")
+    base_no_path = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme else base_url
+
     # public buckets: plain URL — no signature needed since GET is open
     if bc.public:
-        url = f"{base_url.rstrip('/')}/{bucket}/{key}"
+        url = f"{base_no_path}{prefix}/{bucket}/{key}"
         log.info("MCP presign", extra={"bucket": bucket, "key": key, "public": True})
         return {"ok": True, "url": url, "expires": None}
 
     expires = max(1, min(expires, 604800))
     url = generate_presigned_url(
-        base_url=base_url,
+        base_url=base_no_path,
         bucket=bucket,
         key=key,
         public_key=bc.public_key,
         secret_key=bc.key,
         expires=expires,
         host=host,
+        prefix=prefix,
     )
 
     log.info("MCP presign", extra={"bucket": bucket, "key": key, "expires": expires})

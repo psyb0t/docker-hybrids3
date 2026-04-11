@@ -42,6 +42,8 @@ def check_aws_auth(request: Request, config: AppConfig, bucket_name: str) -> boo
             if hdr_creds.access_key == config.master_public_key and config.master_key:
                 return verify_header(request, config.master_key)
             return False
+        if bc.name != bucket_name:
+            return False
         return verify_header(request, bc.key)
 
     # try presigned URL
@@ -64,6 +66,8 @@ def check_aws_auth(request: Request, config: AppConfig, bucket_name: str) -> boo
         if not bc:
             if pre_creds.access_key == config.master_public_key and config.master_key:
                 return verify_presigned(request, config.master_key)
+            return False
+        if bc.name != bucket_name:
             return False
         return verify_presigned(request, bc.key)
 

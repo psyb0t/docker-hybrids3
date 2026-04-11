@@ -39,6 +39,16 @@ def _uri_encode(s: str, encode_slash: bool = True) -> str:
     return urllib.parse.quote(s, safe="~/")
 
 
+def _effective_path(request: Request) -> str:
+    """Return the path the client actually signed.
+
+    When path_prefix is configured (e.g. "/storage"), PathPrefixMiddleware
+    strips it for routing but stashes the original in scope["_original_path"].
+    SigV4 verification must use the original — that's what the client signed.
+    """
+    return request.scope.get("_original_path", request.url.path) or "/"
+
+
 def _canonical_querystring(params: dict[str, str], exclude: set[str]) -> str:
     pairs = []
     for k in sorted(params):
@@ -119,8 +129,8 @@ def verify_presigned(request: Request, secret_key: str) -> bool:
     params = dict(request.query_params)
     canonical_qs = _canonical_querystring(params, {"X-Amz-Signature"})
 
-    # canonical URI — the path
-    path = request.url.path or "/"
+    # canonical URI — reconstruct original path if behind a prefix-stripping proxy
+    path = _effective_path(request)
 
     canonical_request = (
         f"{request.method}\n"
@@ -154,16 +164,19 @@ def generate_presigned_url(
     expires: int = 3600,
     region: str = "us-east-1",
     host: str = "",
+    prefix: str = "",
 ) -> str:
     """Generate an AWS Sig V4 presigned GET URL.
 
     The secret_key signs the URL. Only the public_key appears in the URL.
+    prefix is the reverse proxy path prefix (e.g. "/storage") — included in
+    both the signed path and the final URL so the signature survives stripping.
     """
     now = datetime.now(timezone.utc)
     amz_date = now.strftime("%Y%m%dT%H%M%SZ")
     date_str = now.strftime("%Y%m%d")
 
-    path = f"/{bucket}/{key}"
+    path = f"{prefix}/{bucket}/{key}"
     scope = f"{date_str}/{region}/s3/aws4_request"
     credential = f"{public_key}/{scope}"
 
@@ -219,7 +232,7 @@ def verify_header(request: Request, secret_key: str) -> bool:
     params = dict(request.query_params)
     canonical_qs = _canonical_querystring(params, set())
 
-    path = request.url.path or "/"
+    path = _effective_path(request)
 
     # payload hash — from x-amz-content-sha256 header or UNSIGNED-PAYLOAD
     payload_hash = request.headers.get("x-amz-content-sha256", "UNSIGNED-PAYLOAD")

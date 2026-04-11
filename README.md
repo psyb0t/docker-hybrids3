@@ -566,16 +566,36 @@ path_prefix: /storage
 ```
 
 ```nginx
-# nginx — just forward, no trailing-slash trick, no special headers
+# ✅ CORRECT — no URI in proxy_pass, nginx forwards full path as-is
 location /storage {
     proxy_pass http://hybrids3:8080;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
 }
+
+# ❌ WRONG — trailing slash in proxy_pass is a URI, nginx strips /storage/
+# location /storage/ {
+#     proxy_pass http://hybrids3:8080/;   <-- this "/" is a URI, causes stripping
+# }
 ```
 
-With this config: boto3 at `http://yourdomain/storage`, curl at `http://yourdomain/storage/bucket/key`, MCP at `http://yourdomain/storage/mcp/`.
+The key: `proxy_pass http://backend:8080;` (no trailing `/`) forwards the full path. `proxy_pass http://backend:8080/;` (trailing `/`) tells nginx to replace the location prefix — that strips `/storage/` and breaks SigV4.
+
+With this config:
+
+```bash
+# boto3
+s3 = boto3.client("s3", endpoint_url="http://yourdomain/storage", ...)
+
+# curl
+curl http://yourdomain/storage/uploads/file.txt
+
+# MCP
+{"url": "http://yourdomain/storage/mcp/"}
+```
+
+When `path_prefix` is set, all endpoints move under it — including health (`/storage/health`).
 
 ---
 

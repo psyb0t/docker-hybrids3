@@ -54,7 +54,7 @@ YAML
 events {}
 http {
     server {
-        listen 80;
+        listen 9999;
         location /storage {
             proxy_pass http://${backend_ip}:8080;
             proxy_set_header Host \$http_host;
@@ -72,9 +72,9 @@ EOF
 
     local proxy_ip
     proxy_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$PROXY_CONTAINER")
-    PROXY_BASE="http://${proxy_ip}/storage"
+    PROXY_BASE="http://${proxy_ip}:9999/storage"
 
-    # wait for nginx
+    # wait for nginx — non-standard port tests $http_host preserves port in Host header
     for _ in $(seq 1 10); do
         if curl -sf "${PROXY_BASE}/health" >/dev/null 2>&1; then
             return 0

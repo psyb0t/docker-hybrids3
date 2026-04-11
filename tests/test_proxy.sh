@@ -57,7 +57,7 @@ http {
         listen 80;
         location /storage {
             proxy_pass http://${backend_ip}:8080;
-            proxy_set_header Host \$host;
+            proxy_set_header Host \$http_host;
             proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto \$scheme;
         }

@@ -569,7 +569,7 @@ path_prefix: /storage
 # ✅ CORRECT — no URI in proxy_pass, nginx forwards full path as-is
 location /storage {
     proxy_pass http://hybrids3:8080;
-    proxy_set_header Host $host;
+    proxy_set_header Host $http_host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
 }
@@ -578,6 +578,10 @@ location /storage {
 # location /storage/ {
 #     proxy_pass http://hybrids3:8080/;   <-- this "/" is a URI, causes stripping
 # }
+#
+# ❌ WRONG — $host strips the port, SigV4 signs Host: yourdom:4000
+# but nginx sends Host: yourdom → signature mismatch
+# proxy_set_header Host $host;   <-- use $http_host instead
 ```
 
 The key: `proxy_pass http://backend:8080;` (no trailing `/`) forwards the full path. `proxy_pass http://backend:8080/;` (trailing `/`) tells nginx to replace the location prefix — that strips `/storage/` and breaks SigV4.

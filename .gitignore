@@ -9,3 +9,7 @@ __pycache__
 config.yaml
 ANUSTIMES.md
 test.log
+.venv
+.uv-cache
+*.egg-info
+git-update.sh

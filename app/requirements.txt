@@ -1,6 +1,0 @@
-fastapi==0.135.3
-uvicorn==0.44.0
-pyyaml==6.0.3
-pytimeparse2==1.7.1
-fastmcp==3.2.3
-python-magic==0.4.27

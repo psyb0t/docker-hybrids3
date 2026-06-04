@@ -1,0 +1,48 @@
+[project]
+name = "hybrids3"
+version = "0.1.0"
+description = "Lightweight object storage that speaks S3, plain HTTP, and MCP."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi==0.135.3",
+    "uvicorn==0.44.0",
+    "pyyaml==6.0.3",
+    "pytimeparse2==1.7.1",
+    "fastmcp==3.2.3",
+    "python-magic==0.4.27",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.0.3",
+    "pytest-asyncio==1.4.0",
+    "boto3==1.43.18",
+    "flake8==7.3.0",
+    "black==26.5.1",
+    "isort==8.0.1",
+    "autoflake==2.3.3",
+    "mypy==2.1.0",
+    "vulture==2.16",
+]
+
+[tool.uv]
+# Refuse to install any package version published after this date. Bumped
+# only via scripts/bump_exclude_newer.sh on every dep mutation
+# (pkg-add / pkg-remove / pkg-update / pkg-upgrade). Manual bump only —
+# the rule is "fixed date, not always-N-days-ago".
+exclude-newer = "2026-06-01T00:00:00Z"
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

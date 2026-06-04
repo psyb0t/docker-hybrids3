@@ -170,6 +170,144 @@ test_presign_no_auth() {
 }
 ALL_TESTS+=(test_presign_no_auth)
 
+test_presign_put_private_bucket() {
+    # generate presigned PUT URL for a private bucket
+    local resp
+    resp=$(curl -s -X POST "$BASE/presign/private-bucket/presign-put.txt?method=PUT&expires=60" \
+        -H "Authorization: Bearer priv-key")
+    local url method
+    url=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['url'])")
+    method=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['method'])")
+    assert_eq "$method" "PUT" "response method is PUT"
+
+    if ! echo "$url" | grep -q "X-Amz-Signature"; then
+        echo "  FAIL: private presign PUT URL missing signature"
+        return 1
+    fi
+
+    # PUT via presigned URL — no bearer header needed
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "$url" --data-binary "uploaded via presign PUT")
+    assert_eq "$code" "200" "presigned PUT upload accepted"
+
+    # verify via bearer GET
+    local body
+    body=$(curl -s "$BASE/private-bucket/presign-put.txt" -H "Authorization: Bearer priv-key")
+    assert_eq "$body" "uploaded via presign PUT" "uploaded content readable"
+
+    curl -s -X DELETE "$BASE/private-bucket/presign-put.txt" -H "Authorization: Bearer priv-key" >/dev/null
+}
+ALL_TESTS+=(test_presign_put_private_bucket)
+
+test_presign_put_public_bucket_must_sign() {
+    # public buckets allow anonymous READS, never anonymous WRITES.
+    # PUT presign on a public bucket must still return a signed URL.
+    local resp
+    resp=$(curl -s -X POST "$BASE/presign/public-bucket/presign-pub-put.txt?method=PUT&expires=60" \
+        -H "Authorization: Bearer pub-key")
+
+    local url expires_val
+    url=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['url'])")
+    expires_val=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['expires'])")
+    assert_eq "$expires_val" "60" "public PUT presign has expiry (signed)"
+
+    if ! echo "$url" | grep -q "X-Amz-Signature"; then
+        echo "  FAIL: public PUT presign URL missing signature"
+        return 1
+    fi
+    echo "  OK: public PUT presign URL is signed"
+
+    # upload without bearer
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "$url" --data-binary "pub put body")
+    assert_eq "$code" "200" "public presigned PUT upload accepted"
+
+    # anonymous GET should work (public bucket)
+    local body
+    body=$(curl -s "$BASE/public-bucket/presign-pub-put.txt")
+    assert_eq "$body" "pub put body" "uploaded body readable anonymously"
+
+    curl -s -X DELETE "$BASE/public-bucket/presign-pub-put.txt" \
+        -H "Authorization: Bearer pub-key" >/dev/null
+}
+ALL_TESTS+=(test_presign_put_public_bucket_must_sign)
+
+test_presign_put_tampered_signature() {
+    local resp
+    resp=$(curl -s -X POST "$BASE/presign/private-bucket/presign-put-tamper.txt?method=PUT&expires=60" \
+        -H "Authorization: Bearer priv-key")
+    local url
+    url=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['url'])")
+
+    local tampered
+    tampered=$(echo "$url" | sed 's/X-Amz-Signature=[a-f0-9]*/X-Amz-Signature=0000000000000000000000000000000000000000000000000000000000000000/')
+
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "$tampered" --data-binary "should not land")
+    assert_eq "$code" "404" "tampered presigned PUT rejected"
+
+    # confirm nothing was written
+    code=$(curl -s -o /dev/null -w "%{http_code}" \
+        "$BASE/private-bucket/presign-put-tamper.txt" -H "Authorization: Bearer priv-key")
+    assert_eq "$code" "404" "no object created from tampered PUT"
+}
+ALL_TESTS+=(test_presign_put_tampered_signature)
+
+test_presign_put_method_mismatch() {
+    # a URL signed for PUT must not be usable for GET, and vice versa
+    local resp
+    resp=$(curl -s -X POST "$BASE/presign/private-bucket/presign-method-mix.txt?method=PUT&expires=60" \
+        -H "Authorization: Bearer priv-key")
+    local put_url
+    put_url=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['url'])")
+
+    # GET against a PUT-signed URL: signature does not match
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" "$put_url")
+    assert_eq "$code" "403" "GET against PUT-signed URL rejected"
+}
+ALL_TESTS+=(test_presign_put_method_mismatch)
+
+test_presign_invalid_method() {
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" \
+        -X POST "$BASE/presign/private-bucket/x.txt?method=DELETE" \
+        -H "Authorization: Bearer priv-key")
+    assert_eq "$code" "400" "unsupported method rejected"
+}
+ALL_TESTS+=(test_presign_invalid_method)
+
+test_presign_put_expiry_enforced() {
+    # generate a presigned PUT URL with a 2s expiry
+    local resp
+    resp=$(curl -s -X POST "$BASE/presign/private-bucket/presign-put-exp.txt?method=PUT&expires=2" \
+        -H "Authorization: Bearer priv-key")
+    local url
+    url=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['url'])")
+
+    # PUT before expiry should succeed
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "$url" --data-binary "in time")
+    assert_eq "$code" "200" "presigned PUT works before expiry"
+
+    # wait past the expiry window
+    sleep 4
+
+    # PUT after expiry should be rejected
+    # (write path masks bucket existence on auth failure → 404, not 403)
+    code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "$url" --data-binary "too late")
+    assert_eq "$code" "404" "presigned PUT after expiry rejected"
+
+    # confirm the expired PUT did not overwrite the original body
+    local body
+    body=$(curl -s "$BASE/private-bucket/presign-put-exp.txt" -H "Authorization: Bearer priv-key")
+    assert_eq "$body" "in time" "expired PUT did not overwrite earlier content"
+
+    curl -s -X DELETE "$BASE/private-bucket/presign-put-exp.txt" \
+        -H "Authorization: Bearer priv-key" >/dev/null
+}
+ALL_TESTS+=(test_presign_put_expiry_enforced)
+
 test_request_id_header() {
     local rid
     rid=$(curl -s -D - -o /dev/null "$BASE/health" 2>/dev/null | grep -i "x-request-id:" | tr -d '\r' | awk '{print $2}')

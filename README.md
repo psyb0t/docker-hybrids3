@@ -34,6 +34,7 @@ Lightweight object storage that speaks S3 (boto3/AWS SDK compatible), plain HTTP
 - [Behind a Reverse Proxy](#behind-a-reverse-proxy)
 - [Security](#security)
 - [Testing](#testing)
+- [Development](#development)
 - [Architecture](#architecture)
 - [Limitations](#limitations)
 - [License](#license)
@@ -215,10 +216,10 @@ Do not embed the master key in client-facing code. Use per-bucket keys for that 
 
 ### Bucket visibility
 
-| Setting         | GET / HEAD / LIST                              | PUT / DELETE / presign   |
-| --------------- | ---------------------------------------------- | ------------------------ |
-| `public: true`  | no authentication required                     | bucket key or master key |
-| `public: false` | bucket key, master key, or valid presigned URL | bucket key or master key |
+| Setting         | GET / HEAD / LIST                              | PUT                                              | DELETE / presign         |
+| --------------- | ---------------------------------------------- | ------------------------------------------------ | ------------------------ |
+| `public: true`  | no authentication required                     | bucket key, master key, or valid presigned PUT   | bucket key or master key |
+| `public: false` | bucket key, master key, or valid presigned GET | bucket key, master key, or valid presigned PUT   | bucket key or master key |
 
 ---
 
@@ -274,7 +275,7 @@ curl http://localhost:8080/ \
 | `GET`    | `/{bucket}/{key}`         | read                 | Download object                                                    |
 | `HEAD`   | `/{bucket}/{key}`         | read                 | Object metadata — no body                                          |
 | `DELETE` | `/{bucket}/{key}`         | write                | Delete object — returns 204 even if it does not exist              |
-| `POST`   | `/presign/{bucket}/{key}` | write                | Generate a presigned URL                                           |
+| `POST`   | `/presign/{bucket}/{key}` | write                | Generate a presigned URL (GET or PUT, see `method` query param)    |
 | `POST`   | `/mcp/`                   | per-tool             | MCP Streamable HTTP endpoint                                       |
 
 `PUT /{bucket}` exists purely for S3 client compatibility. boto3 sends a `create_bucket` call before any operation, which maps to this endpoint. HybridS3 treats it as a no-op — no buckets are created or modified.
@@ -366,6 +367,13 @@ url = s3.generate_presigned_url(
     Params={"Bucket": "permanent", "Key": "doc.pdf"},
     ExpiresIn=3600,
 )
+
+# presigned URL someone else can use to upload a single key
+put_url = s3.generate_presigned_url(
+    "put_object",
+    Params={"Bucket": "uploads", "Key": "inbox/report.pdf"},
+    ExpiresIn=600,
+)
 ```
 
 ---
@@ -439,7 +447,7 @@ list_buckets(auth_key="uploads-secret")  # returns only the uploads bucket
 | `list_objects`    | bucket key or master key (private buckets only) | List objects with optional prefix filter. Default 100 results, max 1000.                                                                     |
 | `list_buckets`    | master key or bucket key                        | Master key lists all buckets. Bucket key lists only that bucket.                                                                             |
 | `object_info`     | bucket key or master key (private buckets only) | Get object metadata (size, content type, ETag, expiry time) without downloading the content.                                                 |
-| `presign_url`     | bucket key or master key                        | Generate a shareable URL. Returns a plain URL for public buckets, a signed expiring URL for private buckets.                                 |
+| `presign_url`     | bucket key or master key                        | Generate a shareable URL. Pass `method="GET"` (default) or `method="PUT"`. GET on a public bucket returns a plain URL; everything else is a signed expiring URL. |
 
 All tools return structured output (`structuredContent`) for clients that support it, with a plain text fallback.
 
@@ -447,9 +455,18 @@ All tools return structured output (`structuredContent`) for clients that suppor
 
 ## Presigned URLs
 
-Presigned URLs allow anyone with the link to download an object for a limited time, without authentication credentials.
+Presigned URLs allow anyone with the link to read or write a specific object for a limited time, without sending an `Authorization` header. The `/presign/{bucket}/{key}` endpoint supports two methods via the `method` query parameter:
 
-**Private bucket** — generates an AWS Sig V4 presigned URL. The server signs the URL using the bucket's private key, which never appears in the URL. The URL contains the `public_key` in the `Credential=` field and the HMAC in `X-Amz-Signature`. Expired or tampered URLs return 403.
+- `method=GET` (default) — recipient can download the object.
+- `method=PUT` — recipient can upload (overwrite) the object.
+
+A presigned URL is bound to its HTTP verb. A GET URL cannot be used to PUT and vice versa — the signature includes the method in its canonical request.
+
+Expiry range: 1 second to 604800 seconds (7 days). Default: 3600. Expired or tampered URLs return 403.
+
+### Presigned GET
+
+**Private bucket** — generates an AWS Sig V4 presigned URL. The server signs the URL using the bucket's private key, which never appears in the URL. The URL contains the `public_key` in the `Credential=` field and the HMAC in `X-Amz-Signature`.
 
 ```bash
 # generate via HTTP endpoint
@@ -457,10 +474,8 @@ curl -X POST "http://localhost:8080/presign/permanent/doc.pdf?expires=3600" \
   -H "Authorization: Bearer perm-secret"
 
 # response
-{"url": "http://localhost:8080/permanent/doc.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&...&X-Amz-Signature=...", "expires": 3600}
+{"url": "http://localhost:8080/permanent/doc.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&...&X-Amz-Signature=...", "method": "GET", "expires": 3600}
 ```
-
-Expiry range: 1 second to 604800 seconds (7 days). Default: 3600.
 
 **Public bucket** — returns a plain URL with no signature and no expiry, since GET on public buckets requires no auth anyway.
 
@@ -469,12 +484,41 @@ curl -X POST "http://localhost:8080/presign/uploads/photo.jpg" \
   -H "Authorization: Bearer uploads-secret"
 
 # response
-{"url": "http://localhost:8080/uploads/photo.jpg", "expires": null}
+{"url": "http://localhost:8080/uploads/photo.jpg", "method": "GET", "expires": null}
 ```
 
-Generating a presigned URL requires the bucket's private key or the master key. The resulting URL grants read-only access to that one object.
+### Presigned PUT
 
-Both the `/presign/` HTTP endpoint and the `presign_url` MCP tool follow this same logic.
+Use `method=PUT` to hand someone a URL that lets them upload a specific key without seeing your bucket key. Public buckets are not a shortcut here — anonymous **reads** are allowed, anonymous **writes** never are — so a presigned PUT URL is always signed, even for public buckets.
+
+```bash
+# generate a presigned upload URL
+curl -X POST "http://localhost:8080/presign/uploads/inbox/report.pdf?method=PUT&expires=600" \
+  -H "Authorization: Bearer uploads-secret"
+
+# response
+{"url": "http://localhost:8080/uploads/inbox/report.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&...&X-Amz-Signature=...", "method": "PUT", "expires": 600}
+
+# upload using only the URL — no Authorization header
+curl -X PUT "<url>" --data-binary @report.pdf
+```
+
+The bucket's `max_file_size` is enforced server-side during the upload; oversized bodies are rejected with `413` regardless of how the request was authenticated.
+
+With boto3:
+
+```python
+url = s3.generate_presigned_url(
+    "put_object",
+    Params={"Bucket": "uploads", "Key": "inbox/report.pdf"},
+    ExpiresIn=600,
+)
+# hand `url` to a client; they PUT their bytes to it
+```
+
+Generating a presigned URL requires the bucket's private key or the master key. The resulting URL grants exactly one action (GET or PUT) on exactly one key.
+
+Both the `/presign/` HTTP endpoint and the `presign_url` MCP tool follow this same logic — pass `method="PUT"` to the MCP tool to get an upload URL.
 
 ---
 
@@ -625,22 +669,59 @@ When `path_prefix` is set, all endpoints move under it — including health (`/s
 ## Testing
 
 ```bash
-# run unit tests + build image + run integration tests
+# build prod image + run unit tests in the dev container + run integration suite
 make test
 
-# run a single test by name
+# run a single integration test by name
 ./test.sh test_s3_presigned_private
 
 # list all available test names
 ./test.sh --help
 
-# lock unit tests — no Docker required, runs in ~1 second
-python -m pytest tests/test_lock_unit.py -v
+# unit tests only, inside the dev container
+make test-unit
 ```
 
 All test output is teed to `test.log` automatically.
 
-The integration tests cover: HTTP API, S3/boto3 compatibility, MCP tools, Bearer auth, AWS Sig V4 auth, presigned URLs (HTTP endpoint and S3 SDK), master key, cross-bucket key isolation, TTL expiry, orphan cleanup, MIME detection, size limits, path traversal attempts, binary files, concurrent reads and writes, RW lock behavior at unit and HTTP level, request IDs, and security headers.
+The integration tests cover: HTTP API, S3/boto3 compatibility, MCP tools, Bearer auth, AWS Sig V4 auth, presigned URLs (HTTP endpoint and S3 SDK, GET and PUT), master key, cross-bucket key isolation, TTL expiry, orphan cleanup, MIME detection, size limits, path traversal attempts, binary files, concurrent reads and writes, RW lock behavior at unit and HTTP level, request IDs, and security headers.
+
+---
+
+## Development
+
+All development tooling lives inside a sandboxed dev container so the host stays clean and supply-chain blast radius is contained. The host only needs `docker`, `make`, `git`, and a shell — no Python interpreter, no `pip`, no `uv`, no project deps installed globally.
+
+```bash
+# one-time: build the dev container (also rebuilds when uv.lock changes)
+make dev-image
+
+# drop into a shell with the full dev env on PATH
+make shell
+
+# lint + format + unit tests — all run in the dev container
+make lint
+make format
+make test-unit
+```
+
+### Dependency management
+
+The project uses [`uv`](https://docs.astral.sh/uv/) with a hash-locked `uv.lock` (committed) and a supply-chain age gate (`[tool.uv] exclude-newer` in `pyproject.toml`) that refuses to install any package version published after a fixed date. Every dep mutation bumps that date to **3 days ago** in the same commit, then re-locks.
+
+| Target | What it does | Bumps age gate? |
+|---|---|---|
+| `make pkg-lock` | Refresh `uv.lock` under the current gate | No |
+| `make pkg-add PKG=name[==ver]` | Add a package | Yes |
+| `make pkg-remove PKG=name` | Remove a package | Yes |
+| `make pkg-update PKG=name` | Upgrade one package | Yes |
+| `make pkg-upgrade` | Upgrade every package | Yes |
+
+Never run `uv` directly — every supported mutation has a Make target so the gate stays anchored.
+
+### Production image
+
+`make build` produces the production image. The Dockerfile is multi-stage, pins both the Python base and `uv` by `@sha256` digest, installs with `uv sync --frozen --no-dev` (lockfile-verified, no dev deps), and copies only the resulting venv + app source into the runtime stage. There is no `pip` invocation anywhere in this project.
 
 ---
 

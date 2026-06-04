@@ -230,6 +230,53 @@ s3.delete_object(Bucket='private-bucket', Key='presign-wrongkey.txt')
 }
 ALL_TESTS+=(test_s3_presigned_wrong_key)
 
+test_s3_presigned_put_private() {
+    # boto3 generates a presigned PUT URL; the URL alone is enough to upload
+    run_s3 "priv-access-id" "priv-key" "
+import urllib.request
+url = s3.generate_presigned_url(
+    'put_object',
+    Params={'Bucket': 'private-bucket', 'Key': 's3-presign-put.bin'},
+    ExpiresIn=60,
+)
+assert 'priv-key' not in url, f'private key leaked: {url}'
+assert 'priv-access-id' in url, f'public key not in URL: {url}'
+req = urllib.request.Request(url, data=b'put via presign', method='PUT')
+resp = urllib.request.urlopen(req)
+assert resp.status == 200, f'status: {resp.status}'
+
+# read back through boto3 (auth header) to confirm landed
+got = s3.get_object(Bucket='private-bucket', Key='s3-presign-put.bin')['Body'].read()
+assert got == b'put via presign', f'got: {got}'
+
+s3.delete_object(Bucket='private-bucket', Key='s3-presign-put.bin')
+print('ok')
+" || { echo "  FAIL: s3 presigned PUT private"; return 1; }
+    echo "  OK: s3 presigned PUT (private bucket, key not leaked)"
+}
+ALL_TESTS+=(test_s3_presigned_put_private)
+
+test_s3_presigned_put_wrong_key() {
+    # presigned PUT signed with the wrong secret must be rejected
+    run_s3 "priv-access-id" "WRONG-SECRET" "
+import urllib.request, urllib.error
+url = s3.generate_presigned_url(
+    'put_object',
+    Params={'Bucket': 'private-bucket', 'Key': 's3-presign-put-bad.bin'},
+    ExpiresIn=60,
+)
+req = urllib.request.Request(url, data=b'should not land', method='PUT')
+try:
+    urllib.request.urlopen(req)
+    raise AssertionError('wrong-key presigned PUT should fail')
+except urllib.error.HTTPError as e:
+    assert e.code in (403, 404), f'expected 403/404, got {e.code}'
+print('ok')
+" || { echo "  FAIL: s3 presigned PUT wrong key"; return 1; }
+    echo "  OK: s3 presigned PUT with wrong key rejected"
+}
+ALL_TESTS+=(test_s3_presigned_put_wrong_key)
+
 test_s3_overwrite() {
     run_s3 "pub-access-id" "pub-key" "
 s3.put_object(Bucket='public-bucket', Key='s3overwrite.txt', Body=b'v1')

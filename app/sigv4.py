@@ -165,12 +165,14 @@ def generate_presigned_url(
     region: str = "us-east-1",
     host: str = "",
     prefix: str = "",
+    method: str = "GET",
 ) -> str:
-    """Generate an AWS Sig V4 presigned GET URL.
+    """Generate an AWS Sig V4 presigned URL for the given HTTP method.
 
     The secret_key signs the URL. Only the public_key appears in the URL.
     prefix is the reverse proxy path prefix (e.g. "/storage") — included in
     both the signed path and the final URL so the signature survives stripping.
+    method selects the HTTP verb the URL grants (typically GET or PUT).
     """
     now = datetime.now(timezone.utc)
     amz_date = now.strftime("%Y%m%dT%H%M%SZ")
@@ -195,7 +197,7 @@ def generate_presigned_url(
 
     canonical_headers = f"host:{host}\n"
     canonical_request = (
-        f"GET\n"
+        f"{method.upper()}\n"
         f"{_uri_encode(path, encode_slash=False)}\n"
         f"{canonical_qs}\n"
         f"{canonical_headers}\n"

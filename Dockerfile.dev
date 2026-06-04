@@ -1,0 +1,41 @@
+# Dev container — sandboxes every install / lint / test / lockfile op.
+# Never used in production. Built via `make dev-image`.
+#
+# Base + uv pinned by digest (tags are mutable, digests aren't).
+# Bump these manually when you intentionally update tooling.
+
+# uv 0.11.19
+ARG UV_DIGEST=sha256:b46b03ddfcfbf8f547af7e9eaefdf8a39c8cebcba7c98858d3162bd28cf536f6
+# python:3.12-slim-bookworm
+FROM python@sha256:93ab4b7fa528b25124c97bcc755415e60eb671a86b4dbe0328df2fe2d1c1193d AS dev
+
+ARG UV_DIGEST
+COPY --from=ghcr.io/astral-sh/uv@sha256:b46b03ddfcfbf8f547af7e9eaefdf8a39c8cebcba7c98858d3162bd28cf536f6 \
+     /uv /uvx /usr/local/bin/
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libmagic1 \
+        ca-certificates \
+        make \
+        git \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV UV_LINK_MODE=copy \
+    UV_CACHE_DIR=/tmp/uv-cache \
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /work
+
+# Bake the full lockfile (runtime + dev) so the image self-contains the env.
+# Bind-mounting source at `make` time uses this baked venv directly.
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/tmp/uv-cache,uid=1000,gid=1000 \
+    uv sync --frozen --no-install-project
+
+# Allow non-root users to write the venv when they run uv add/remove from
+# inside the container. World-writable is acceptable here — this image
+# never runs in production.
+RUN chmod -R a+rwX /opt/venv /work

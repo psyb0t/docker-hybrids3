@@ -342,20 +342,22 @@ async def presign_url(
     bucket: str,
     key: str,
     auth_key: str,
+    method: str = "GET",
     expires: int = 3600,
     base_url: str = "",
     host: str = "",
 ) -> dict[str, Any]:
-    """Generate an S3-compatible presigned URL for reading an object.
+    """Generate an S3-compatible presigned URL for an object.
 
     Returns a proper AWS Sig V4 presigned URL. The private key signs the URL
-    but never appears in it. Anyone with the URL can read the object until
-    it expires.
+    but never appears in it. Anyone with the URL can perform the named method
+    on the object until it expires.
 
     Args:
         bucket: The bucket name.
         key: The object key (path).
         auth_key: The bucket key or master key for authentication.
+        method: HTTP verb the URL grants — "GET" (default) or "PUT".
         expires: Seconds until the URL expires (default 3600, max 604800 = 7 days).
         base_url: Base URL for the generated link (e.g. "http://host:8080").
         host: Hostname for the URL (derived from base_url if empty).
@@ -369,6 +371,10 @@ async def presign_url(
     if not _check_key(bucket, auth_key):
         return {"error": f"Bucket '{bucket}' does not exist"}
 
+    method = method.upper()
+    if method not in {"GET", "PUT"}:
+        return {"error": "method must be GET or PUT"}
+
     bc = _config.buckets[bucket]
 
     # extract prefix from base_url path (e.g. http://host:4000/storage → prefix=/storage)
@@ -376,11 +382,15 @@ async def presign_url(
     prefix = parsed.path.rstrip("/")
     base_no_path = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme else base_url
 
-    # public buckets: plain URL — no signature needed since GET is open
-    if bc.public:
+    # public buckets + GET: plain URL — reads are open so no signature needed.
+    # PUT must always sign — public buckets allow anonymous reads, not writes.
+    if bc.public and method == "GET":
         url = f"{base_no_path}{prefix}/{bucket}/{key}"
-        log.info("MCP presign", extra={"bucket": bucket, "key": key, "public": True})
-        return {"ok": True, "url": url, "expires": None}
+        log.info(
+            "MCP presign",
+            extra={"bucket": bucket, "key": key, "method": method, "public": True},
+        )
+        return {"ok": True, "url": url, "method": method, "expires": None}
 
     expires = max(1, min(expires, 604800))
     url = generate_presigned_url(
@@ -392,7 +402,11 @@ async def presign_url(
         expires=expires,
         host=host,
         prefix=prefix,
+        method=method,
     )
 
-    log.info("MCP presign", extra={"bucket": bucket, "key": key, "expires": expires})
-    return {"ok": True, "url": url, "expires": expires}
+    log.info(
+        "MCP presign",
+        extra={"bucket": bucket, "key": key, "method": method, "expires": expires},
+    )
+    return {"ok": True, "url": url, "method": method, "expires": expires}

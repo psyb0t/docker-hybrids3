@@ -147,15 +147,19 @@ async def list_buckets(request: Request) -> Response:
 # ── presign ──────────────────────────────────────────────────────────────────
 
 
+_PRESIGN_METHODS = {"GET", "PUT"}
+
+
 @router.post("/presign/{bucket}/{key:path}")
 async def presign(request: Request, bucket: str, key: str) -> Response:
-    """Generate an S3-compatible presigned URL for reading an object.
+    """Generate an S3-compatible presigned URL for an object.
 
     Returns a proper AWS Sig V4 presigned URL. The private key signs the URL
     but never appears in it — only the public_key (access ID) is visible.
 
     Query params:
-        expires: seconds until URL expires (default 3600, max 604800 = 7 days)
+        method:  HTTP verb the URL grants — GET (default) or PUT.
+        expires: seconds until URL expires (default 3600, max 604800 = 7 days).
     """
     bc, err = _get_bucket(request, bucket)
     if err:
@@ -163,6 +167,10 @@ async def presign(request: Request, bucket: str, key: str) -> Response:
     auth_err = _check_write_auth(request, bucket)
     if auth_err:
         return auth_err
+
+    method = request.query_params.get("method", "GET").upper()
+    if method not in _PRESIGN_METHODS:
+        return _err(request, 400, "InvalidArgument", "method must be GET or PUT")
 
     base = str(request.base_url).rstrip("/")
     prefix = request.scope.get("_original_path", "")
@@ -174,11 +182,12 @@ async def presign(request: Request, bucket: str, key: str) -> Response:
     else:
         prefix = ""
 
-    # public buckets: plain URL — no signature needed since GET is open
-    if bc.public:
+    # public buckets + GET: plain URL — reads are open so no signature needed.
+    # PUT must always sign — public buckets allow anonymous reads, not writes.
+    if bc.public and method == "GET":
         url = f"{base}{prefix}/{bucket}/{key}"
-        log.info("presign", extra={"bucket": bucket, "key": key, "public": True})
-        return JSONResponse({"url": url, "expires": None})
+        log.info("presign", extra={"bucket": bucket, "key": key, "method": method, "public": True})
+        return JSONResponse({"url": url, "method": method, "expires": None})
 
     try:
         expires = int(request.query_params.get("expires", "3600"))
@@ -196,10 +205,14 @@ async def presign(request: Request, bucket: str, key: str) -> Response:
         expires=expires,
         host=host,
         prefix=prefix,
+        method=method,
     )
 
-    log.info("presign", extra={"bucket": bucket, "key": key, "expires": expires})
-    return JSONResponse({"url": url, "expires": expires})
+    log.info(
+        "presign",
+        extra={"bucket": bucket, "key": key, "method": method, "expires": expires},
+    )
+    return JSONResponse({"url": url, "method": method, "expires": expires})
 
 
 # ── bucket ops ───────────────────────────────────────────────────────────────

@@ -1,0 +1,53 @@
+{
+  "name": "@psyb0t/hybrids3",
+  "version": "0.0.0",
+  "mcpName": "io.github.psyb0t/hybrids3",
+  "description": "Connect an OpenClaw/MCP agent to a self-hosted hybrids3 object storage service over MCP.",
+  "type": "module",
+  "bin": {
+    "hybrids3-mcp": "bin/cli.js"
+  },
+  "files": [
+    "bin",
+    "openclaw.plugin.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "author": "psyb0t",
+  "homepage": "https://github.com/psyb0t/docker-hybrids3",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/psyb0t/docker-hybrids3.git"
+  },
+  "bugs": {
+    "url": "https://github.com/psyb0t/docker-hybrids3/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "hybrids3",
+    "s3",
+    "object-storage",
+    "openclaw",
+    "ai-agent"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "mcp-remote": "0.1.38"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "openclaw": {
+    "extensions": ["./bin/cli.js"],
+    "compat": {
+      "pluginApi": ">=2026.3.24-beta.2"
+    },
+    "build": {
+      "openclawVersion": "2026.3.24-beta.2"
+    }
+  }
+}

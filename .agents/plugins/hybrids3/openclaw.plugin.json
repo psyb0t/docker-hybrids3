@@ -1,0 +1,39 @@
+{
+  "name": "@psyb0t/hybrids3",
+  "id": "@psyb0t/hybrids3",
+  "version": "0.0.0",
+  "type": "code-plugin",
+  "summary": "Wire an OpenClaw agent to a self-hosted hybrids3 object storage service over MCP — upload, download, list, and delete objects as tools.",
+  "description": "A thin stdio<->HTTP bridge that connects an MCP client (OpenClaw, Claude, Cursor, Codex, ...) to a running hybrids3 instance's MCP endpoint (/mcp/), exposing its object storage tools: upload_object, download_object, delete_object, list_objects, list_buckets, object_info, and presign_url. hybrids3 is self-hosted — you run the server yourself and point this bridge at it. See https://github.com/psyb0t/docker-hybrids3.",
+  "extensions": ["./bin/cli.js"],
+  "compat": {
+    "pluginApi": ">=2026.3.24-beta.2"
+  },
+  "build": {
+    "openclawVersion": "2026.3.24-beta.2"
+  },
+  "environment": {
+    "HYBRIDS3_URL": {
+      "required": true,
+      "description": "Base URL of your running hybrids3 server, e.g. http://localhost:8080 (the bridge appends /mcp/)."
+    },
+    "HYBRIDS3_KEY": {
+      "required": false,
+      "description": "Bearer token — a bucket's private key or the master key, only if the hybrids3 endpoint requires connection-level auth."
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "required": ["url"],
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Base URL of your running hybrids3 server, e.g. http://localhost:8080 (the bridge appends /mcp/)."
+      },
+      "token": {
+        "type": "string",
+        "description": "Bearer token — a bucket's private key or the master key, only if the hybrids3 endpoint requires connection-level auth."
+      }
+    }
+  }
+}

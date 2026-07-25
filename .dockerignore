@@ -2,6 +2,7 @@
 .github
 .gitignore
 .dockerignore
+.agents/
 .research_files
 .testdata
 __pycache__

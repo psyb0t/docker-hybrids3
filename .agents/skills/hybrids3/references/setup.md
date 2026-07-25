@@ -29,7 +29,7 @@ vi config.yaml
 
 # run
 docker run -d --name hybrids3 \
-    -p 8080:8080 \
+    -p 127.0.0.1:8080:8080 \
     -v ./config.yaml:/config/config.yaml:ro \
     -v hybrids3-data:/data \
     psyb0t/hybrids3
@@ -37,6 +37,8 @@ docker run -d --name hybrids3 \
 # verify
 curl http://localhost:8080/health      # → {"status":"ok"}
 ```
+
+**`-p 8080:8080` binds all interfaces** — the service becomes reachable from the network, not just localhost. Use `-p 127.0.0.1:8080:8080` (loopback-only) unless remote access is intentionally required, matching the fleet convention.
 
 ### docker-compose
 
@@ -124,7 +126,7 @@ For S3 clients (`boto3`, `aws-cli`), the credentials aren't hybrids3 env vars �
 |---|---|
 | `AWS_ACCESS_KEY_ID` / `aws_access_key_id` | the bucket's `public_key` (or `master_public_key`) |
 | `AWS_SECRET_ACCESS_KEY` / `aws_secret_access_key` | the bucket's `key` (or `master_key`) |
-| `AWS_DEFAULT_REGION` / `region_name` | any value; use `us-east-1` |
+| `AWS_DEFAULT_REGION` / `region_name` | any value — server doesn't check it; `us-east-1` below is just an example |
 | `endpoint_url` | `HYBRIDS3_URL` (e.g. `http://localhost:8080`) |
 
 The skill's own convenience vars for HTTP/MCP work: `HYBRIDS3_URL`, `HYBRIDS3_KEY`, `HYBRIDS3_PUBLIC_KEY`, `HYBRIDS3_MASTER_KEY`, `HYBRIDS3_MASTER_PUBLIC_KEY`.

@@ -28,6 +28,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # python:3.12-slim-bookworm
 FROM python@sha256:93ab4b7fa528b25124c97bcc755415e60eb671a86b4dbe0328df2fe2d1c1193d AS runtime
 
+# MCP Registry ownership label — required for io.github.psyb0t/hybrids3 listing
+LABEL io.modelcontextprotocol.server.name="io.github.psyb0t/hybrids3"
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libmagic1 \
     && rm -rf /var/lib/apt/lists/*

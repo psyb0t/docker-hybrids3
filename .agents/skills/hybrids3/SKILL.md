@@ -20,6 +20,14 @@ Object keys support nested paths (`reports/2024/jan.pdf`). Content type is auto-
 
 For installation, configuration, and container setup, see [references/setup.md](references/setup.md).
 
+## Security & safety
+
+- **Public buckets are world-readable.** A bucket with `public: true` serves `GET`/`HEAD`/`LIST` to anyone who can reach the port — no auth at all. Only store data there that's meant to be openly readable; keep sensitive data in a `public: false` bucket.
+- **Bind loopback, not all interfaces.** The container listens on `8080`. Publishing it as `-p 8080:8080` / compose `"8080:8080"` makes it reachable from the network by default. Use `-p 127.0.0.1:8080:8080` (loopback) unless remote access is intentionally required, and for real deployments put the service on an internal Docker network behind a reverse proxy instead of exposing the port directly — see [references/setup.md](references/setup.md#quick-install) and [Behind a Reverse Proxy](references/setup.md#behind-a-reverse-proxy).
+- **`DELETE`, presigned `PUT`, and MCP `delete_object` are destructive & irreversible.** There's no undo, no versioning, no recycle bin — a deleted object (or one overwritten via `PUT`) is gone. An agent must NEVER call `DELETE` / `delete_object`, or generate/use a presigned `PUT` that overwrites, unless the user explicitly asked for that exact key to be removed or replaced; confirm the specific bucket + key first, never enumerate-then-bulk-delete, and treat bulk cleanup as requiring explicit per-object user confirmation.
+- **Bucket keys, master key, and presigned URLs are bearer credentials.** Whoever holds a bucket's private `key` or the `master_key` (or a live presigned URL) can act as that bucket/master until the credential is rotated or the URL expires — there's no per-caller revocation. Never paste these into shared prompts, logs, or presigned URLs handed to untrusted parties beyond the one object they're meant to grant.
+- **This skill is a consumer, not an operator.** It talks to an instance the user already runs; it doesn't provision, harden, or expose the server. Don't use this skill to reconfigure `config.yaml`, change bucket visibility, or alter port bindings on the user's behalf without being explicitly asked.
+
 ## When To Use
 
 - Put / get / list / delete files in a self-hosted, S3-compatible object store.
@@ -117,6 +125,8 @@ put_url = s3.generate_presigned_url(
 
 For cross-bucket access or `list_buckets()` returning **all** buckets, build a second client with the **master** credentials (`aws_access_key_id=master_public_key`, `aws_secret_access_key=master_key`). Don't embed the master key in client-facing code — per-bucket keys scope access to one bucket.
 
+**Destructive & irreversible.** `delete_object` deletes the object with no undo — no versioning, no recycle bin. An agent must NEVER call it unless the user explicitly asked for that exact key to be deleted; confirm the specific bucket + key first, scope it to the current task, and never enumerate-then-bulk-delete. On a shared instance where multiple callers use the same bucket, this can destroy another caller's data — treat bulk deletes as admin-only and requiring explicit confirmation.
+
 ### aws-cli
 
 ```bash
@@ -144,6 +154,8 @@ Requests carrying an AWS Sig V4 `Authorization` header get S3-style XML back; ev
 | `DELETE` | `/{bucket}/{key}` | write | Delete object — always `204`, even if absent. |
 | `GET` | `/{bucket}` | read | List objects. Query: `prefix`, `max-keys`. |
 | `POST` | `/presign/{bucket}/{key}` | write | Generate a presigned URL. Query: `method` (`GET` default / `PUT`), `expires` (seconds, 1–604800, default 3600). |
+
+**Destructive & irreversible.** `DELETE` removes the object with no undo. An agent must NEVER call it unless the user explicitly asked for that exact key to be deleted; confirm the specific bucket + key first, scope it to the current task, and never enumerate-then-bulk-delete. On a shared bucket used by other callers, this can destroy their data — treat it as admin-only.
 
 ```bash
 # upload
@@ -252,6 +264,8 @@ claude mcp add --transport http hybrids3 "$HYBRIDS3_URL/mcp/" \
 | `list_buckets` | `auth_key` | master or bucket key | Master lists all; bucket key lists only its own. |
 | `object_info` | `bucket`, `key`, `auth_key=""` | key on private only | Metadata only (size, content_type, etag, uploaded_at, expires_at). |
 | `presign_url` | `bucket`, `key`, `auth_key`, `method="GET"`, `expires=3600`, `base_url=""`, `host=""` | bucket/master key | `method` GET/PUT. Same public-GET-plain / everything-else-signed logic as the HTTP endpoint. `expires` clamped 1–604800. Set `base_url` to the externally-reachable URL so the link is usable. |
+
+**`delete_object` is destructive & irreversible.** It deletes the object with no undo. An agent must NEVER call it unless the user explicitly asked for that exact key to be deleted; confirm the specific bucket + key first, never enumerate-then-bulk-delete. On a shared bucket used by other callers, this can destroy their data — treat it as admin-only.
 
 All tools return `structuredContent` with a plain-text fallback. Internal error details are masked.
 

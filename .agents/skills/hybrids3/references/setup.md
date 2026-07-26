@@ -47,7 +47,7 @@ services:
   hybrids3:
     image: psyb0t/hybrids3
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
       - ./config.yaml:/config/config.yaml:ro
       - hybrids3-data:/data
@@ -56,6 +56,10 @@ services:
 volumes:
   hybrids3-data:
 ```
+
+**`"127.0.0.1:8080:8080"` binds loopback-only.** Use `"8080:8080"` only if remote access is intentionally required, matching the fleet convention above. For a real deployment where other hosts or services need to reach it, put hybrids3 on an internal Docker network and front it with a reverse proxy (see [Behind a Reverse Proxy](#behind-a-reverse-proxy)) rather than publishing the port on all interfaces.
+
+**Uploads to a `public: true` bucket are world-readable.** Any bucket with `public: true` serves GET/HEAD/LIST with no authentication at all — anyone who can reach the port can read anything stored there. Don't put sensitive data in a public bucket, and keep the port bound to loopback (or behind an authenticating proxy) unless that's the intended exposure.
 
 ## Configuration
 

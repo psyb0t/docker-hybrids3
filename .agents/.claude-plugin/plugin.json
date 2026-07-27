@@ -1,0 +1,22 @@
+{
+  "name": "hybrids3",
+  "description": "Self-hosted lightweight object storage speaking S3 (boto3/AWS SDK, Sig V4), plain HTTP (curl + Bearer auth), and MCP (Streamable HTTP tools) from one container — SQLite metadata, flat-file storage, config-defined buckets, per-bucket keys, a cross-bucket master key, and presigned GET/PUT URLs.",
+  "author": { "name": "psyb0t", "url": "https://github.com/psyb0t" },
+  "homepage": "https://github.com/psyb0t/docker-hybrids3",
+  "license": "WTFPL",
+  "keywords": ["s3", "object-storage", "mcp", "boto3", "presigned-urls", "self-hosted", "sqlite"],
+  "userConfig": {
+    "hybrids3_url": {
+      "type": "string",
+      "title": "HybridS3 URL",
+      "description": "Base URL of your running hybrids3 server (HYBRIDS3_URL), e.g. http://localhost:8080",
+      "required": true
+    },
+    "hybrids3_key": {
+      "type": "string",
+      "title": "HybridS3 bucket/master key",
+      "description": "Bearer token (HYBRIDS3_KEY) — a bucket's private key or the master key. Only needed if the endpoint requires connection-level auth.",
+      "sensitive": true
+    }
+  }
+}

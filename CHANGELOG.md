@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.3.6] - 2026-07-27
+
+- Added `.agents/.claude-plugin/plugin.json` and `.agents/.codex-plugin/plugin.json` manifests so the existing skill and OpenClaw MCP-bridge plugin install natively in Claude Code and Codex.
+- Added an "## Agent integrations" README section with copy-pasteable install commands for Claude Code, Codex, and OpenClaw (skill + MCP-bridge plugin).
+
 ## [v0.3.5] - 2026-07-27
 
 - Added a GitHub Actions CI status badge to the README.

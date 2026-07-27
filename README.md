@@ -31,6 +31,7 @@ Lightweight object storage that speaks S3 (boto3/AWS SDK compatible), plain HTTP
   - [Connecting](#connecting)
   - [Authentication](#authentication-2)
   - [Tools](#tools)
+- [Agent integrations](#agent-integrations)
 - [Presigned URLs](#presigned-urls)
 - [MIME Type Detection](#mime-type-detection)
 - [TTL and Expiry](#ttl-and-expiry)
@@ -455,6 +456,45 @@ list_buckets(auth_key="uploads-secret")  # returns only the uploads bucket
 | `presign_url`     | bucket key or master key                        | Generate a shareable URL. Pass `method="GET"` (default) or `method="PUT"`. GET on a public bucket returns a plain URL; everything else is a signed expiring URL. |
 
 All tools return structured output (`structuredContent`) for clients that support it, with a plain text fallback.
+
+---
+
+## Agent integrations
+
+The [skill](.agents/skills/hybrids3) works in any agent that reads `.agents/skills/`, and installs natively in the clients below.
+
+### Claude Code
+
+```bash
+claude plugin marketplace add psyb0t/agents
+claude plugin install hybrids3@psyb0t
+```
+
+Claude Code prompts for the HybridS3 URL and, if the endpoint requires connection-level auth, the bucket/master key — the key is stored in your OS keychain.
+
+### Codex
+
+```bash
+codex plugin marketplace add psyb0t/agents
+```
+
+Codex also picks the skill up automatically in any repo containing `.agents/skills/`, and invokes it as `$hybrids3`.
+
+### OpenClaw
+
+The skill is published to ClawHub on every release:
+
+```bash
+openclaw skills install @psyb0t/hybrids3
+```
+
+For MCP clients that speak local stdio, the [`@psyb0t/hybrids3`](.agents/plugins/hybrids3) plugin bridges to the service's `/mcp/` endpoint:
+
+```bash
+openclaw plugins install clawhub:@psyb0t/hybrids3
+```
+
+Then set `HYBRIDS3_URL` (and `HYBRIDS3_KEY` if your endpoint requires connection-level auth).
 
 ---
 

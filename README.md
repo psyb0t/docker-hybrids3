@@ -476,9 +476,10 @@ Claude Code prompts for the HybridS3 URL and, if the endpoint requires connectio
 
 ```bash
 codex plugin marketplace add psyb0t/agents
+codex plugin add hybrids3@psyb0t
 ```
 
-Codex also picks the skill up automatically in any repo containing `.agents/skills/`, and invokes it as `$hybrids3`.
+Installed via the marketplace, the skill invokes as `$hybrids3:hybrids3`. Codex also picks the skill up automatically, no install required, in any repo containing `.agents/skills/` — there it invokes as plain `$hybrids3`.
 
 ### OpenClaw
 

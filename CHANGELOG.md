@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.3.7] - 2026-07-27
+
+- Fixed the Codex subsection of "## Agent integrations" — it told the reader to run `codex plugin marketplace add psyb0t/agents` and then stopped, never giving the actual install command. Added `codex plugin add hybrids3@psyb0t`.
+- Corrected the invocation prose: a skill installed via the marketplace invokes as `$hybrids3:hybrids3`, while a skill Codex picks up automatically from a repo's own `.agents/skills/` (no install needed) invokes as plain `$hybrids3`. These are two different mechanisms and were previously conflated.
+
 ## [v0.3.6] - 2026-07-27
 
 - Added `.agents/.claude-plugin/plugin.json` and `.agents/.codex-plugin/plugin.json` manifests so the existing skill and OpenClaw MCP-bridge plugin install natively in Claude Code and Codex.

@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.3.5] - 2026-07-27
+
+- Added a GitHub Actions CI status badge to the README.
+
 ## [v0.3.4] - 2026-07-27
 
 - Added self-hosted version and license badges plus a Docker Hub pulls badge; wired a badges job into pipeline.yml.

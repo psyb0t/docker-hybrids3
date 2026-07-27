@@ -1,5 +1,6 @@
 # HybridS3
 
+[![CI](https://github.com/psyb0t/docker-hybrids3/actions/workflows/pipeline.yml/badge.svg?branch=main)](https://github.com/psyb0t/docker-hybrids3/actions/workflows/pipeline.yml)
 [![version](https://raw.githubusercontent.com/psyb0t/docker-hybrids3/badges/version.svg)](https://github.com/psyb0t/docker-hybrids3/releases)
 [![license](https://raw.githubusercontent.com/psyb0t/docker-hybrids3/badges/license.svg)](LICENSE)
 [![Docker Pulls](https://img.shields.io/docker/pulls/psyb0t/hybrids3?style=flat-square)](https://hub.docker.com/r/psyb0t/hybrids3)

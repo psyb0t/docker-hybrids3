@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.3.9], 2026-10-10
+
+Documentation only. The README's agent integrations section names [peen](https://github.com/psyb0t/peen) as an example of an agent that reads `.agents/skills/`.
+
 ## [v0.3.8] - 2026-08-01
 
 CI plumbing only. No code in this repo changed — every commit in this release touches `.github/workflows/`.

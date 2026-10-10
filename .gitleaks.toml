@@ -1,0 +1,14 @@
+# Secret scanning: gitleaks' default rules. Release scans cover only the files
+# being committed, so no path allowlist is needed.
+[extend]
+useDefault = true
+
+# The README's curl examples use these made-up bucket and master keys. Only
+# the exact placeholder values are allowed, so a real key in the same spot
+# still fails the scan.
+[[allowlists]]
+description = "Placeholder keys in the README examples"
+regexTarget = "match"
+regexes = [
+  '''Bearer (uploads-secret|perm-secret|your-master-key)\b''',
+]

@@ -4,7 +4,6 @@
 [![version](https://raw.githubusercontent.com/psyb0t/docker-hybrids3/badges/version.svg)](https://github.com/psyb0t/docker-hybrids3/releases)
 [![license](https://raw.githubusercontent.com/psyb0t/docker-hybrids3/badges/license.svg)](LICENSE)
 [![Docker Pulls](https://img.shields.io/docker/pulls/psyb0t/hybrids3?style=flat-square)](https://hub.docker.com/r/psyb0t/hybrids3)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/psyb0t/docker-hybrids3)
 
 Lightweight object storage that speaks S3 (boto3/AWS SDK compatible), plain HTTP, and MCP. SQLite for metadata, flat files on disk.
 

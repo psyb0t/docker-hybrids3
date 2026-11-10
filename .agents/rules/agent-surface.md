@@ -6,7 +6,7 @@ Applies to `.agents/skills/`, `.agents/plugins/`, `.agents/.claude-plugin/`, `.a
 - Keep the destructive-operation guardrails next to every `DELETE`, `delete_object` and presigned `PUT` in the skill.
 - Every route, tool, argument, default and limit named in the skill must match the code and the docs site. Fix both when either changes.
 - `scripts/hybrids3.sh` prints its own header comment (lines 2 to 30) as help text. Keep the usage block inside those lines when editing it.
-- The OpenClaw plugin (`.agents/plugins/hybrids3/`) is MIT, unlike the WTFPL repository. Its `bin/cli.js` only proxies stdio through `mcp-remote` to `$HYBRIDS3_URL/mcp/`, with `Authorization: Bearer $HYBRIDS3_KEY` when that is set. Stdout is the MCP channel, so diagnostics go to stderr and the token is never logged. `mcp-remote` is pinned to an exact version in `package.json`.
+- The OpenClaw plugin (`.agents/plugins/hybrids3/`) is MIT, unlike the WTFPL repository. Its `bin/cli.js` only proxies stdio through `mcp-remote` to `$HYBRIDS3_URL/mcp/`, with `Authorization: Bearer $HYBRIDS3_KEY` when that is set. Stdout is the MCP channel, so diagnostics go to stderr and the token is never logged.
 - The tool list in the plugin README, `openclaw.plugin.json` and the skill must match the `@mcp.tool` functions in `app/mcp_server.py`.
 - `pipeline.yml` publishes exactly the directories listed in `skill_names` and `plugin_names`. Add a new skill or plugin directory to those arrays.
 - `server.json` and the Dockerfile `LABEL` share the name `io.github.psyb0t/hybrids3`. Keep them equal.

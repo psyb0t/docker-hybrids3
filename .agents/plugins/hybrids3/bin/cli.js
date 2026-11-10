@@ -3,7 +3,7 @@
 // running hybrids3 server's Streamable-HTTP endpoint (`$HYBRIDS3_URL/mcp/`),
 // authenticating with `$HYBRIDS3_KEY` when the server requires it.
 //
-// stdout IS the MCP protocol channel, so diagnostics go to stderr only — the
+// stdout IS the MCP protocol channel, so diagnostics go to stderr only. The
 // sole output here is a fatal pre-launch console.error (user-facing CLI
 // output). The token is passed to the proxy as an argv header, never logged.
 import { spawnSync } from "node:child_process";
@@ -22,7 +22,7 @@ if (!base) {
 Point this bridge at your running hybrids3 server, e.g.:
   export HYBRIDS3_URL=http://localhost:8080
 
-hybrids3 is self-hosted — see https://github.com/psyb0t/docker-hybrids3`,
+hybrids3 is self-hosted, see https://github.com/psyb0t/docker-hybrids3`,
   );
   process.exit(1);
 }

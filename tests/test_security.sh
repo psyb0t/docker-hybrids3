@@ -46,7 +46,7 @@ test_max_keys_negative() {
     local resp
     resp=$(curl -s "$BASE/public-bucket?max-keys=-1")
     local count
-    count=$(echo "$resp" | python3 -c "import sys,json; print(len(json.load(sys.stdin)['objects']))")
+    count=$(echo "$resp" | py -c "import sys,json; print(len(json.load(sys.stdin)['objects']))")
     assert_eq "$count" "1" "max-keys=-1 clamped to 1"
 
     curl -s -X DELETE "$BASE/public-bucket/mk1.txt" -H "Authorization: Bearer pub-key" >/dev/null
@@ -65,11 +65,11 @@ test_presign_endpoint() {
 
     # expires should be null (no expiry on plain URLs)
     local expires_val
-    expires_val=$(echo "$resp" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['expires'])")
+    expires_val=$(echo "$resp" | py -c "import sys,json; d=json.load(sys.stdin); print(d['expires'])")
     assert_eq "$expires_val" "None" "public presign returns null expires"
 
     local url
-    url=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['url'])")
+    url=$(echo "$resp" | py -c "import sys,json; print(json.load(sys.stdin)['url'])")
 
     # URL should not contain X-Amz-Signature
     if echo "$url" | grep -q "X-Amz-Signature"; then
@@ -96,7 +96,7 @@ test_presign_private_bucket() {
     resp=$(curl -s -X POST "$BASE/presign/private-bucket/presign-priv.txt?expires=60" \
         -H "Authorization: Bearer priv-key")
     local url
-    url=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['url'])")
+    url=$(echo "$resp" | py -c "import sys,json; print(json.load(sys.stdin)['url'])")
 
     # fetch via presigned URL — should work without bearer auth
     local body
@@ -122,7 +122,7 @@ test_presign_expiry_enforced() {
     resp=$(curl -s -X POST "$BASE/presign/private-bucket/presign-exp.txt?expires=2" \
         -H "Authorization: Bearer priv-key")
     local url
-    url=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['url'])")
+    url=$(echo "$resp" | py -c "import sys,json; print(json.load(sys.stdin)['url'])")
 
     # should work now
     local body
@@ -149,7 +149,7 @@ test_presign_tampered_signature() {
     resp=$(curl -s -X POST "$BASE/presign/private-bucket/presign-tamper.txt?expires=60" \
         -H "Authorization: Bearer priv-key")
     local url
-    url=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['url'])")
+    url=$(echo "$resp" | py -c "import sys,json; print(json.load(sys.stdin)['url'])")
 
     # tamper with the X-Amz-Signature value
     local tampered
@@ -176,8 +176,8 @@ test_presign_put_private_bucket() {
     resp=$(curl -s -X POST "$BASE/presign/private-bucket/presign-put.txt?method=PUT&expires=60" \
         -H "Authorization: Bearer priv-key")
     local url method
-    url=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['url'])")
-    method=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['method'])")
+    url=$(echo "$resp" | py -c "import sys,json; print(json.load(sys.stdin)['url'])")
+    method=$(echo "$resp" | py -c "import sys,json; print(json.load(sys.stdin)['method'])")
     assert_eq "$method" "PUT" "response method is PUT"
 
     if ! echo "$url" | grep -q "X-Amz-Signature"; then
@@ -207,8 +207,8 @@ test_presign_put_public_bucket_must_sign() {
         -H "Authorization: Bearer pub-key")
 
     local url expires_val
-    url=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['url'])")
-    expires_val=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['expires'])")
+    url=$(echo "$resp" | py -c "import sys,json; print(json.load(sys.stdin)['url'])")
+    expires_val=$(echo "$resp" | py -c "import sys,json; print(json.load(sys.stdin)['expires'])")
     assert_eq "$expires_val" "60" "public PUT presign has expiry (signed)"
 
     if ! echo "$url" | grep -q "X-Amz-Signature"; then
@@ -237,7 +237,7 @@ test_presign_put_tampered_signature() {
     resp=$(curl -s -X POST "$BASE/presign/private-bucket/presign-put-tamper.txt?method=PUT&expires=60" \
         -H "Authorization: Bearer priv-key")
     local url
-    url=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['url'])")
+    url=$(echo "$resp" | py -c "import sys,json; print(json.load(sys.stdin)['url'])")
 
     local tampered
     tampered=$(echo "$url" | sed 's/X-Amz-Signature=[a-f0-9]*/X-Amz-Signature=0000000000000000000000000000000000000000000000000000000000000000/')
@@ -259,7 +259,7 @@ test_presign_put_method_mismatch() {
     resp=$(curl -s -X POST "$BASE/presign/private-bucket/presign-method-mix.txt?method=PUT&expires=60" \
         -H "Authorization: Bearer priv-key")
     local put_url
-    put_url=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['url'])")
+    put_url=$(echo "$resp" | py -c "import sys,json; print(json.load(sys.stdin)['url'])")
 
     # GET against a PUT-signed URL: signature does not match
     local code
@@ -283,7 +283,7 @@ test_presign_put_expiry_enforced() {
     resp=$(curl -s -X POST "$BASE/presign/private-bucket/presign-put-exp.txt?method=PUT&expires=2" \
         -H "Authorization: Bearer priv-key")
     local url
-    url=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['url'])")
+    url=$(echo "$resp" | py -c "import sys,json; print(json.load(sys.stdin)['url'])")
 
     # PUT before expiry should succeed
     local code
@@ -329,7 +329,7 @@ test_request_id_in_error_response() {
     local resp
     resp=$(curl -s "$BASE/fakebucket/nope")
     local has_rid
-    has_rid=$(echo "$resp" | python3 -c "import sys,json; d=json.load(sys.stdin); print('yes' if 'request_id' in d else 'no')")
+    has_rid=$(echo "$resp" | py -c "import sys,json; d=json.load(sys.stdin); print('yes' if 'request_id' in d else 'no')")
     assert_eq "$has_rid" "yes" "JSON error contains request_id"
 }
 ALL_TESTS+=(test_request_id_in_error_response)
@@ -350,7 +350,7 @@ test_like_wildcard_injection() {
     local resp
     resp=$(curl -s "$BASE/public-bucket?prefix=%25")
     local count
-    count=$(echo "$resp" | python3 -c "import sys,json; print(len(json.load(sys.stdin)['objects']))")
+    count=$(echo "$resp" | py -c "import sys,json; print(len(json.load(sys.stdin)['objects']))")
     assert_eq "$count" "0" "prefix=% doesn't match all objects"
 
     curl -s -X DELETE "$BASE/public-bucket/normal.txt" -H "Authorization: Bearer pub-key" >/dev/null

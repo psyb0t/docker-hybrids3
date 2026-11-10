@@ -4,6 +4,7 @@
 #   - Everything runs inside the dev container ($(DEV_RUN)) — never on the
 #     host. The one exception is `test`, which calls `./test.sh` directly:
 #     that script needs the host docker daemon to spawn the test container.
+#     Its Python helpers still run in the dev image (TEST_PYTHON_IMAGE).
 #   - Dep mutations (pkg-add / pkg-remove / pkg-update / pkg-upgrade) bump
 #     the supply-chain age gate FIRST via scripts/bump_exclude_newer.sh,
 #     then run uv inside the dev container. pkg-lock does not bump.
@@ -15,6 +16,11 @@ IMAGE_NAME := psyb0t/hybrids3
 TAG        := latest
 TEST_TAG   := $(TAG)-test
 DEV_IMAGE  := psyb0t/hybrids3-dev:latest
+
+# ── Docs site ────────────────────────────────────────────────────────────────
+# The image GitHub Pages builds with, pinned by digest. Output is gitignored.
+DOCS_IMAGE := ghcr.io/actions/jekyll-build-pages:v1.0.13@sha256:6791ebfd912185ed59bfb5fb102664fa872496b79f87ff8b9cfba292a7345041
+DOCS_SITE  := .testing/docs-site
 
 # ── Supply-chain ─────────────────────────────────────────────────────────────
 PYPROJECT  := pyproject.toml
@@ -33,7 +39,7 @@ DEV_RUN := docker run --rm \
 .PHONY: help all dev-image shell \
 	pkg-lock pkg-add pkg-remove pkg-update pkg-upgrade \
 	lint format test-unit test \
-	build run stop logs clean
+	build run stop logs clean docs
 
 all: help
 
@@ -94,11 +100,26 @@ test-unit: dev-image ## Run Python unit tests inside the dev container
 
 # ── Integration tests ────────────────────────────────────────────────────────
 # Runs on the host: test.sh shells out to `docker build` / `docker run` against
-# the host daemon. DIND would only add ceremony — see CLAUDE.md carve-out.
-# Host needs: docker + curl + python3 with boto3 + fastmcp installed.
+# the host daemon. DIND would only add ceremony. The Python helpers (boto3,
+# fastmcp, JSON parsing) run in the dev image, so the host needs only docker,
+# curl and bash. This is also what CI runs.
 
 test: build test-unit ## Build prod image + run unit tests + run integration suite
-	./test.sh
+	TEST_PYTHON_IMAGE=$(DEV_IMAGE) ./test.sh
+
+# ── Docs site ────────────────────────────────────────────────────────────────
+
+docs: ## Build the docs/ site with the GitHub Pages image (output is gitignored)
+	@mkdir -p $(DOCS_SITE)
+	docker run --rm \
+		-u $(UID):$(GID) -e HOME=/tmp \
+		-e GITHUB_WORKSPACE=/work \
+		-e GITHUB_REPOSITORY=psyb0t/docker-hybrids3 \
+		-e INPUT_SOURCE=docs \
+		-e INPUT_DESTINATION=$(DOCS_SITE) \
+		-e INPUT_VERBOSE=false \
+		-v $(PWD):/work \
+		$(DOCS_IMAGE)
 
 # ── Production image ─────────────────────────────────────────────────────────
 

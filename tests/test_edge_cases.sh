@@ -4,7 +4,7 @@
 test_max_file_size_under_limit() {
     # tiny-bucket has max_file_size: 100B
     local data
-    data=$(python3 -c "print('x' * 50, end='')")
+    data=$(py -c "print('x' * 50, end='')")
     local code
     code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "$BASE/tiny-bucket/small.txt" \
         -H "Authorization: Bearer tiny-key" -d "$data")
@@ -17,7 +17,7 @@ ALL_TESTS+=(test_max_file_size_under_limit)
 test_max_file_size_over_limit() {
     # tiny-bucket has max_file_size: 100B
     local data
-    data=$(python3 -c "print('x' * 200, end='')")
+    data=$(py -c "print('x' * 200, end='')")
     local code
     code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "$BASE/tiny-bucket/toobig.txt" \
         -H "Authorization: Bearer tiny-key" -d "$data")
@@ -28,7 +28,7 @@ ALL_TESTS+=(test_max_file_size_over_limit)
 test_max_file_size_exact_boundary() {
     # exactly 100 bytes
     local data
-    data=$(python3 -c "print('x' * 100, end='')")
+    data=$(py -c "print('x' * 100, end='')")
     local code
     code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "$BASE/tiny-bucket/exact.txt" \
         -H "Authorization: Bearer tiny-key" -d "$data")
@@ -153,7 +153,7 @@ test_binary_file() {
     # upload binary data
     local tmpfile
     tmpfile=$(mktemp)
-    python3 -c "import sys; sys.stdout.buffer.write(bytes(range(256)))" > "$tmpfile"
+    py -c "import sys; sys.stdout.buffer.write(bytes(range(256)))" > "$tmpfile"
 
     local code
     code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "$BASE/public-bucket/binary.bin" \

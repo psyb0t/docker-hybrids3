@@ -8,7 +8,7 @@ _concurrent() {
     local n="$3"
     shift 3
     # remaining args are extra curl flags (e.g. -H, -d)
-    python3 - "$method" "$url" "$n" "$@" <<'EOF'
+    py - "$method" "$url" "$n" "$@" <<'EOF'
 import sys, subprocess, concurrent.futures
 
 method = sys.argv[1]
@@ -71,7 +71,7 @@ test_concurrent_read_write_mix() {
 
     # 5 readers + 5 writers simultaneously via a single Python process
     local all_codes
-    all_codes=$(python3 - "$BASE/public-bucket/conc-mix.txt" <<'EOF'
+    all_codes=$(py - "$BASE/public-bucket/conc-mix.txt" <<'EOF'
 import sys, subprocess, concurrent.futures
 
 url = sys.argv[1]
@@ -149,7 +149,7 @@ ALL_TESTS+=(test_concurrent_deletes)
 
 test_concurrent_different_keys() {
     # writes to different keys should never block each other
-    python3 - "$BASE" <<'EOF'
+    py - "$BASE" <<'EOF'
 import sys, subprocess, concurrent.futures, time
 
 base = sys.argv[1]

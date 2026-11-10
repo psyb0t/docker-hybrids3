@@ -12,3 +12,12 @@ regexTarget = "match"
 regexes = [
   '''Bearer (uploads-secret|perm-secret|your-master-key)\b''',
 ]
+
+# The integration tests run against a throwaway container configured with
+# these made-up keys.
+[[allowlists]]
+description = "Fixed test keys in the integration suite"
+regexTarget = "match"
+regexes = [
+  '''Bearer (pub-key|priv-key|test-master-key|tiny-key|exp-key|wrong-key|totally-wrong-key|wrong|rejected|header|token)\b''',
+]

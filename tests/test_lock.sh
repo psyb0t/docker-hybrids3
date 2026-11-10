@@ -5,7 +5,7 @@
 LOCK_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/app"
 
 run_lock_test() {
-    python3 - "$LOCK_PY" <<EOF
+    py - "$LOCK_PY" <<EOF
 import sys, asyncio
 sys.path.insert(0, sys.argv[1])
 from lock import _RWLock, LockManager, LockTimeout, LockHoldTimeout, LockOverloaded

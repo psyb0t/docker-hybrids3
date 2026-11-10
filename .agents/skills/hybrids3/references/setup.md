@@ -1,13 +1,13 @@
 # hybrids3 setup
 
-Consumer-side reference for standing up an instance to talk to. If an operator already runs one, you only need its URL and a bucket key — skip to [OpenClaw / ClawHub Config](#openclaw--clawhub-config).
+Consumer-side reference for standing up an instance to talk to. If an operator already runs one, you only need its URL and a bucket key. Skip to [OpenClaw / ClawHub Config](#openclaw--clawhub-config).
 
 ## Requirements
 
 - Docker
-- A `config.yaml` (buckets, keys, master key — see [Configuration](#configuration))
+- A `config.yaml` (buckets, keys, master key; see [Configuration](#configuration))
 - A persistent volume/dir for `/data` (object bytes + SQLite metadata)
-- ~1 core / modest RAM — it's a thin FastAPI service, not a cluster
+- ~1 core / modest RAM. It's a thin FastAPI service, not a cluster
 
 The container runs as **UID 1000** and expects:
 
@@ -24,7 +24,7 @@ Grab the example config, edit keys + buckets, run:
 wget -O config.yaml \
   https://raw.githubusercontent.com/psyb0t/docker-hybrids3/master/config.example.yaml
 
-# edit it — set master_key and each bucket's key
+# edit it: set master_key and each bucket's key
 vi config.yaml
 
 # run
@@ -38,7 +38,7 @@ docker run -d --name hybrids3 \
 curl http://localhost:8080/health      # → {"status":"ok"}
 ```
 
-**`-p 8080:8080` binds all interfaces** — the service becomes reachable from the network, not just localhost. Use `-p 127.0.0.1:8080:8080` (loopback-only) unless remote access is intentionally required, matching the fleet convention.
+**`-p 8080:8080` binds all interfaces**: the service becomes reachable from the network, not just localhost. Use `-p 127.0.0.1:8080:8080` (loopback-only) unless remote access is intentionally required, matching the fleet convention.
 
 ### docker-compose
 
@@ -59,17 +59,17 @@ volumes:
 
 **`"127.0.0.1:8080:8080"` binds loopback-only.** Use `"8080:8080"` only if remote access is intentionally required, matching the fleet convention above. For a real deployment where other hosts or services need to reach it, put hybrids3 on an internal Docker network and front it with a reverse proxy (see [Behind a Reverse Proxy](#behind-a-reverse-proxy)) rather than publishing the port on all interfaces.
 
-**Uploads to a `public: true` bucket are world-readable.** Any bucket with `public: true` serves GET/HEAD/LIST with no authentication at all — anyone who can reach the port can read anything stored there. Don't put sensitive data in a public bucket, and keep the port bound to loopback (or behind an authenticating proxy) unless that's the intended exposure.
+**Uploads to a `public: true` bucket are world-readable.** Any bucket with `public: true` serves GET/HEAD/LIST with no authentication at all. Anyone who can reach the port can read anything stored there. Don't put sensitive data in a public bucket, and keep the port bound to loopback (or behind an authenticating proxy) unless that's the intended exposure.
 
 ## Configuration
 
-**All configuration is the YAML file — there are no application env vars.** Buckets are defined here and only here; there is no create/delete API. Change config and restart to add or remove a bucket.
+**All configuration is the YAML file. There are no application env vars.** Buckets are defined here and only here; there is no create/delete API. Change config and restart to add or remove a bucket.
 
 Top-level keys:
 
 | Field | Default | What it does |
 |---|---|---|
-| `master_key` | `""` | Cross-bucket god key — works on every bucket, only credential that lists all buckets. Keep secret. |
+| `master_key` | `""` | Cross-bucket god key. Works on every bucket, only credential that lists all buckets. Keep secret. |
 | `master_public_key` | `"master"` | Non-secret `aws_access_key_id` paired with `master_key` in S3 auth. Safe to share. |
 | `cleanup_interval` | `60` (`1m`) | How often the background loop deletes expired objects + orphan files. Duration string (`30s`, `5m`, `1h`) or raw seconds. |
 | `lock_acquire_timeout` | `30` | Seconds a request waits for a per-key lock before `503`. Float. |
@@ -77,7 +77,7 @@ Top-level keys:
 | `lock_max_waiters` | `100` | Max requests queued for one key before new ones get `503` immediately. |
 | `path_prefix` | `""` | Serve all routes under a subpath (e.g. `/storage`) for reverse-proxy deployments. `"/storage"` and `"/storage/"` both normalize. Empty = root. |
 
-Per-bucket fields (under `buckets:`, keyed by bucket name — name must not contain `/` or `..`):
+Per-bucket fields (under `buckets:`, keyed by bucket name; the name must not contain `/` or `..`):
 
 | Field | Default | What it does |
 |---|---|---|
@@ -116,7 +116,7 @@ buckets:
 
 ## Environment Variables
 
-The **application** takes no env vars — everything is in `config.yaml`. The only tunables at run time are Docker-level:
+The **application** takes no env vars; everything is in `config.yaml`. The only tunables at run time are Docker-level:
 
 | Concern | How | Example |
 |---|---|---|
@@ -124,13 +124,13 @@ The **application** takes no env vars — everything is in `config.yaml`. The on
 | Data location | mount to `/data` | `-v hybrids3-data:/data` |
 | Host port / interface | `docker run -p` | `-p 127.0.0.1:8080:8080` (loopback), `-p 8080:8080` (all interfaces) |
 
-For S3 clients (`boto3`, `aws-cli`), the credentials aren't hybrids3 env vars — they're the standard AWS SDK ones, sourced from a bucket's config:
+For S3 clients (`boto3`, `aws-cli`), the credentials aren't hybrids3 env vars. They're the standard AWS SDK ones, sourced from a bucket's config:
 
 | SDK var / arg | Value from config |
 |---|---|
 | `AWS_ACCESS_KEY_ID` / `aws_access_key_id` | the bucket's `public_key` (or `master_public_key`) |
 | `AWS_SECRET_ACCESS_KEY` / `aws_secret_access_key` | the bucket's `key` (or `master_key`) |
-| `AWS_DEFAULT_REGION` / `region_name` | any value — server doesn't check it; `us-east-1` below is just an example |
+| `AWS_DEFAULT_REGION` / `region_name` | any value. The server doesn't check it; `us-east-1` below is just an example |
 | `endpoint_url` | `HYBRIDS3_URL` (e.g. `http://localhost:8080`) |
 
 The skill's own convenience vars for HTTP/MCP work: `HYBRIDS3_URL`, `HYBRIDS3_KEY`, `HYBRIDS3_PUBLIC_KEY`, `HYBRIDS3_MASTER_KEY`, `HYBRIDS3_MASTER_PUBLIC_KEY`.
@@ -139,13 +139,13 @@ The skill's own convenience vars for HTTP/MCP work: `HYBRIDS3_URL`, `HYBRIDS3_KE
 
 | Port | Service |
 |---|---|
-| 8080 | HTTP API + S3 API + MCP (`/mcp/`) — all on the same port |
+| 8080 | HTTP API + S3 API + MCP (`/mcp/`), all on the same port |
 
 The container listens on `8080` internally. Map it however you like with `-p`.
 
 ## Behind a Reverse Proxy
 
-Set `path_prefix` in config to match the proxy location; hybrids3 serves every route under it natively (including `/{prefix}/health`), so nginx forwards the path **as-is** — no stripping. SigV4 works because the signed path matches what the server sees.
+Set `path_prefix` in config to match the proxy location; hybrids3 serves every route under it natively (including `/{prefix}/health`), so nginx forwards the path **as-is**, no stripping. SigV4 works because the signed path matches what the server sees.
 
 ```yaml
 # config.yaml
@@ -154,8 +154,8 @@ path_prefix: /storage
 
 ```nginx
 location /storage {
-    proxy_pass http://hybrids3:8080;          # NO trailing slash — forwards full path
-    proxy_set_header Host $http_host;         # $http_host, NOT $host — keeps the port for SigV4
+    proxy_pass http://hybrids3:8080;          # NO trailing slash: forwards full path
+    proxy_set_header Host $http_host;         # $http_host, NOT $host: keeps the port for SigV4
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
 }
@@ -163,7 +163,7 @@ location /storage {
 
 Then clients use the prefixed URL: `HYBRIDS3_URL=http://yourdomain/storage`, boto3 `endpoint_url="http://yourdomain/storage"`, MCP `http://yourdomain/storage/mcp/`.
 
-A trailing slash in `proxy_pass` (`http://hybrids3:8080/`) strips the prefix and breaks SigV4 — don't. `$host` drops the port and also breaks SigV4 — use `$http_host`.
+A trailing slash in `proxy_pass` (`http://hybrids3:8080/`) strips the prefix and breaks SigV4, so don't. `$host` drops the port and also breaks SigV4, so use `$http_host`.
 
 ## Management
 

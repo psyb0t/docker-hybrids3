@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.3.10], 2026-11-10
+
+- The documentation is published at https://psyb0t.github.io/docker-hybrids3/. The configuration, HTTP, S3 and MCP API, keys and access, presigned URL, storage, deployment, reverse proxy, security, troubleshooting and development reference moved there from the README.
+- Every branch push now runs lint, the unit tests and the integration suite before anything is built. A push to `main` publishes `:latest` and `:sha-<commit>`, and a release tag promotes that same image instead of rebuilding it, then cuts the GitHub release and publishes the skill, the plugin and the MCP Registry entry.
+- `make test` runs the integration suite's Python helpers in the dev image, so the host needs only Docker, curl and Bash.
+- Buy Me a Coffee is in the funding links, and `AGENTS.md` plus project rules in `.agents/rules/` are committed for coding agents.
+
 ## [v0.3.9], 2026-10-10
 
 Documentation only. The README's agent integrations section names [peen](https://github.com/psyb0t/peen) as an example of an agent that reads `.agents/skills/`.

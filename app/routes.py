@@ -54,7 +54,9 @@ def _err(request: Request, status: int, code: str, message: str) -> Response:
 
 def _lock_err(request: Request, exc: Exception) -> Response:
     if isinstance(exc, LockOverloaded):
-        return _err(request, 503, "ServiceUnavailable", "Too many concurrent requests for this object")
+        return _err(
+            request, 503, "ServiceUnavailable", "Too many concurrent requests for this object"
+        )
     return _err(request, 503, "RequestTimeout", "Lock timed out — try again")
 
 
@@ -81,9 +83,9 @@ def _identify_auth(request: Request) -> str | None:
         if hdr_creds.access_key == config.master_public_key and config.master_key:
             if verify_header(request, config.master_key):
                 return "master"
-        bc = config.find_by_public_key(hdr_creds.access_key)
-        if bc and verify_header(request, bc.key):
-            return bc.name
+        hdr_bc = config.find_by_public_key(hdr_creds.access_key)
+        if hdr_bc and verify_header(request, hdr_bc.key):
+            return hdr_bc.name
 
     return None
 

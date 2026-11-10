@@ -12,10 +12,29 @@ TESTDATA_DIR="$WORKDIR/.testdata"
 
 ALL_TESTS=()
 
+# Image whose python3 runs the Python helpers (boto3, fastmcp, json parsing).
+# Empty means the host python3, which then needs boto3 and fastmcp installed.
+# `make test` sets it to the dev image, so the host needs no Python at all.
+TEST_PYTHON_IMAGE="${TEST_PYTHON_IMAGE:-}"
+
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
+# Run python3 with the given arguments, on the host or in TEST_PYTHON_IMAGE.
+# The container joins the default bridge network, where the test containers
+# are reachable by IP, and sees the repository read-only at its host path.
+py() {
+    if [ -z "$TEST_PYTHON_IMAGE" ]; then
+        python3 "$@"
+        return
+    fi
+    docker run --rm -i \
+        -e PYTHONDONTWRITEBYTECODE=1 \
+        -v "$WORKDIR:$WORKDIR:ro" \
+        "$TEST_PYTHON_IMAGE" python3 "$@"
+}
+
 json_get() {
-    python3 -c "import sys,json; print(json.load(sys.stdin)$1)"
+    py -c "import sys,json; print(json.load(sys.stdin)$1)"
 }
 
 assert_eq() {
@@ -88,7 +107,7 @@ run_s3() {
     local public_key="$1"
     local secret_key="$2"
     shift 2
-    python3 -c "
+    py -c "
 import boto3, json, sys
 from botocore.config import Config as BotoConfig
 s3 = boto3.client(

@@ -28,7 +28,7 @@ test_lock_overload_503() {
     # fire max_waiters+2 (17) concurrent GETs — queue fills at 15, extras get 503
     # acquire_timeout is 0.5s so queued ones also get 503 quickly
     local codes
-    codes=$(python3 - "$BASE/public-bucket/$key" <<'EOF'
+    codes=$(py - "$BASE/public-bucket/$key" <<'EOF'
 import sys, subprocess, concurrent.futures
 
 url = sys.argv[1]

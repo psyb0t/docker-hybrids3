@@ -3,7 +3,7 @@
 
 # Helper: run a python MCP client script against $BASE/mcp/
 run_mcp() {
-    python3 -c "
+    py -c "
 import asyncio
 from fastmcp import Client
 

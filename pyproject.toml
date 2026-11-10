@@ -40,6 +40,15 @@ target-version = ["py312"]
 profile = "black"
 line_length = 100
 
+[tool.mypy]
+python_version = "3.12"
+
+# Neither package ships type information, and adding stub packages would mean
+# a dependency change.
+[[tool.mypy.overrides]]
+module = ["pytimeparse2", "yaml"]
+ignore_missing_imports = true
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

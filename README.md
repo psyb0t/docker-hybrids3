@@ -2,393 +2,86 @@
 
 [![CI](https://github.com/psyb0t/docker-hybrids3/actions/workflows/pipeline.yml/badge.svg?branch=main)](https://github.com/psyb0t/docker-hybrids3/actions/workflows/pipeline.yml)
 [![version](https://raw.githubusercontent.com/psyb0t/docker-hybrids3/badges/version.svg)](https://github.com/psyb0t/docker-hybrids3/releases)
-[![license](https://raw.githubusercontent.com/psyb0t/docker-hybrids3/badges/license.svg)](LICENSE)
+[![license](https://raw.githubusercontent.com/psyb0t/docker-hybrids3/badges/license.svg)](https://github.com/psyb0t/docker-hybrids3/blob/main/LICENSE)
 [![Docker Pulls](https://img.shields.io/docker/pulls/psyb0t/hybrids3?style=flat-square)](https://hub.docker.com/r/psyb0t/hybrids3)
 
 Lightweight object storage that speaks S3 (boto3/AWS SDK compatible), plain HTTP, and MCP. SQLite for metadata, flat files on disk.
 
----
+**Documentation: https://psyb0t.github.io/docker-hybrids3/**
 
-## Table of Contents
+## Table of contents
 
 - [Why](#why)
-- [Quick Start](#quick-start)
-- [Running](#running)
-- [Configuration](#configuration)
-- [Keys and Access](#keys-and-access)
-  - [Key pair model](#key-pair-model)
-  - [Master key](#master-key)
-  - [Bucket visibility](#bucket-visibility)
-- [HTTP API](#http-api)
-  - [Authentication](#authentication)
-  - [Endpoints](#endpoints)
-  - [Object keys](#object-keys)
-  - [Response format](#response-format)
-- [S3 Interface](#s3-interface)
-  - [Authentication](#authentication-1)
-  - [Operations](#operations)
-- [MCP Interface](#mcp-interface)
-  - [Connecting](#connecting)
-  - [Authentication](#authentication-2)
-  - [Tools](#tools)
-- [Agent integrations](#agent-integrations)
-- [Presigned URLs](#presigned-urls)
-- [MIME Type Detection](#mime-type-detection)
-- [TTL and Expiry](#ttl-and-expiry)
-- [Locking](#locking)
-- [Logging](#logging)
-- [Behind a Reverse Proxy](#behind-a-reverse-proxy)
-- [Security](#security)
-- [Testing](#testing)
+- [Quick start](#quick-start)
+- [Three ways in](#three-ways-in)
+- [Documentation](#documentation)
 - [Development](#development)
-- [Architecture](#architecture)
 - [Limitations](#limitations)
+- [Sponsor](#sponsor)
 - [License](#license)
-
----
 
 ## Why
 
-**Most self-hosted S3-compatible storage is designed for large-scale deployments.** Distributed erasure coding, IAM policies, WORM compliance, full web consoles — useful if you're running a cloud, overkill if you just want a place to put files that various services and AI agents can read and write.
+**Most self-hosted S3-compatible storage is built for large deployments.** Distributed erasure coding, IAM policies, WORM compliance, full web consoles. Useful if you run a cloud, overkill if you just want a place to put files that a few services and AI agents can read and write.
 
-**AWS Sig V4 breaks behind reverse proxy path prefixes.** Most implementations verify signatures using the full original upstream path. Put them behind nginx at `/storage/`, nginx strips the prefix, the server sees `/bucket/key` instead of `/storage/bucket/key`, the signature check fails. HybridS3 has a `path_prefix` config option — set it to `/storage` and all routes move under that prefix. No path stripping, no special proxy headers. boto3's signed path matches what the server sees.
+**AWS Sig V4 breaks behind reverse proxy path prefixes.** Put most implementations behind nginx at `/storage/`, nginx strips the prefix, the server sees `/bucket/key` while the client signed `/storage/bucket/key`, and every signature check fails. hybrids3 has a `path_prefix` setting: set it to `/storage`, every route moves under it, the proxy forwards the path untouched and the signatures match.
 
-**Three interfaces, one service.** boto3 works out of the box. Plain HTTP with `curl` works. AI agents connect via MCP and get structured tool definitions. No separate services for different clients.
+**Three interfaces, one service.** boto3 works out of the box. `curl` with a Bearer token works. AI agents connect over MCP and get typed tools. One container, one port.
 
-**Buckets are configuration, not state.** There is no API to create or delete buckets. They live in the YAML config file. You always know exactly what exists, it's version-controlled, and there are no surprise buckets accumulating garbage.
+**Buckets are configuration, not state.** There is no API to create or delete a bucket. Buckets live in the YAML config, so you always know exactly what exists, it's version-controlled, and no surprise buckets pile up garbage.
 
-**TTL expiry is built in.** Set `ttl: 24h` on a bucket and objects expire automatically after their last write. No lifecycle policies, no cron jobs, no separate process.
+**TTL expiry is built in.** Set `ttl: 24h` on a bucket and objects expire 24 hours after their last write. No lifecycle policies, no cron jobs.
 
-**Readable and modifiable.** Small enough to understand in an afternoon.
+**Small enough to read in an afternoon.** Thirteen Python modules.
 
----
-
-## Quick Start
+## Quick start
 
 ```bash
-# get the example config
-wget -O config.yaml https://raw.githubusercontent.com/psyb0t/docker-hybrids3/master/config.example.yaml
+# get the example config, then change every key in it
+wget -O config.yaml \
+  https://raw.githubusercontent.com/psyb0t/docker-hybrids3/main/config.example.yaml
 
-# edit it — set your keys and define your buckets
-vi config.yaml
-
-# run
 docker run -d --name hybrids3 \
-    -p 8080:8080 \
-    -v ./config.yaml:/config/config.yaml:ro \
-    -v hybrids3-data:/data \
-    psyb0t/hybrids3
+  -p 127.0.0.1:8080:8080 \
+  -v ./config.yaml:/config/config.yaml:ro \
+  -v hybrids3-data:/data \
+  psyb0t/hybrids3
 
-# verify
 curl http://localhost:8080/health
 ```
 
----
+The container reads `/config/config.yaml`, keeps everything in `/data` and runs as UID 1000. [Running the container](https://psyb0t.github.io/docker-hybrids3/deployment/) covers Compose, upgrades and backups, and [Configuration](https://psyb0t.github.io/docker-hybrids3/configuration/) lists every setting.
 
-## Running
+## Three ways in
 
-The container expects:
-
-- Config file at `/config/config.yaml`
-- Data directory at `/data`
-- Port `8080`
-
-Runs as UID 1000.
-
-**docker run:**
+Plain HTTP with a Bearer token. Public buckets need no token to read:
 
 ```bash
-docker run -d --name hybrids3 \
-    -p 8080:8080 \
-    -v ./config.yaml:/config/config.yaml:ro \
-    -v hybrids3-data:/data \
-    psyb0t/hybrids3
-```
-
-**docker-compose:**
-
-```yaml
-services:
-  hybrids3:
-    image: psyb0t/hybrids3
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./config.yaml:/config/config.yaml:ro
-      - hybrids3-data:/data
-    restart: unless-stopped
-
-volumes:
-  hybrids3-data:
-```
-
----
-
-## Configuration
-
-```yaml
-# Cross-bucket god key. Works on every bucket for every operation.
-# Only credential that can list all buckets. Keep secret.
-master_key: "change-me-to-something-secret"
-
-# Non-secret identifier paired with master_key in S3 auth (aws_access_key_id).
-# Safe to share — it grants nothing without the master_key.
-master_public_key: "master"
-
-# How often the background loop runs to delete expired objects and orphan files.
-# Accepts human-readable durations: 30s, 5m, 1h, or raw seconds: 60
-cleanup_interval: 1m
-
-# How long a request may wait to acquire a lock on an object before giving up with 503.
-# Accepts seconds as a float. Applies per object key, globally across all buckets.
-lock_acquire_timeout: 30
-
-# How long a request may hold a lock before it is forcibly released and the request gets 503.
-# Protects against slow or stalled uploads blocking writes on the same key indefinitely.
-lock_hold_timeout: 300
-
-# Maximum number of requests that may queue for the same object key at once.
-# Once the queue is full, new requests are rejected immediately with 503.
-lock_max_waiters: 100
-
-# Serve all routes under this path prefix.
-# Set this when running behind a reverse proxy at a subpath (e.g. /storage).
-# Accepts "/storage" or "/storage/" — both are normalized.
-# Leave empty or omit to serve at the root.
-# path_prefix: /storage
-
-# TTL formats:   30s  5m  1h  1h30m12s  1d  2d12h  0 (never expire)
-# Size formats:  500B  50KB  10MB  1GB  0 (no limit)
-
-buckets:
-  uploads:
-    # true  — anyone can read (GET/HEAD/LIST) without authentication
-    # false — authentication required for all operations
-    public: true
-
-    # Private key for this bucket.
-    # Used as the Bearer token value and as aws_secret_access_key in S3 auth.
-    # Never transmitted — only used to sign or verify request signatures.
-    # Keep secret.
-    key: "uploads-secret"
-
-    # Public identifier for this bucket in S3 auth (aws_access_key_id).
-    # Also appears in presigned URL Credential= fields.
-    # Safe to share — it identifies the bucket but grants no access.
-    # Defaults to the bucket name if not set.
-    public_key: "uploads-id"
-
-    # Objects expire this long after their last write. Overwriting resets the clock.
-    # 0 means objects never expire.
-    ttl: 24h
-
-    # Maximum upload size. Requests over this limit are rejected with 413.
-    # 0 means no limit.
-    max_file_size: 50MB
-
-  permanent:
-    public: false
-    key: "perm-secret"
-    public_key: "permanent-id"
-    ttl: 0
-    max_file_size: 100MB
-```
-
----
-
-## Keys and Access
-
-### Key pair model
-
-Each bucket has two keys defined in config:
-
-| Config field | Role                                                                                                                                               | Keep secret?       |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| `key`        | The private key. Used to authenticate Bearer requests and to sign S3 signatures. Never transmitted — only used locally to compute or verify HMACs. | Yes                |
-| `public_key` | The public identifier. Used as `aws_access_key_id` in S3 auth and appears in presigned URL `Credential=` fields. Grants nothing on its own.        | No — safe to share |
-
-The split is what makes presigned URLs work safely. A presigned URL must embed an identifier in the `Credential=` field so the server knows which key to verify against — that identifier is the `public_key`. Since it is non-secret, having it in the URL is fine. The private key signs the URL on the server and never appears in it.
-
-### Master key
-
-The `master_key` is a cross-bucket credential that works on every bucket for every operation, without needing individual bucket keys. Two situations call for it:
-
-- You need to operate across multiple buckets from a single client
-- You need to list all configured buckets — bucket keys only see their own bucket in `list_buckets`
-
-The `master_public_key` is the non-secret identifier that pairs with `master_key` in S3 auth (used as `aws_access_key_id`).
-
-Do not embed the master key in client-facing code. Use per-bucket keys for that — they limit access to exactly one bucket.
-
-### Bucket visibility
-
-| Setting         | GET / HEAD / LIST                              | PUT                                              | DELETE / presign         |
-| --------------- | ---------------------------------------------- | ------------------------------------------------ | ------------------------ |
-| `public: true`  | no authentication required                     | bucket key, master key, or valid presigned PUT   | bucket key or master key |
-| `public: false` | bucket key, master key, or valid presigned GET | bucket key, master key, or valid presigned PUT   | bucket key or master key |
-
----
-
-## HTTP API
-
-### Authentication
-
-HTTP requests authenticate using a Bearer token in the `Authorization` header. Pass the bucket's private `key`, or the master key for cross-bucket operations.
-
-```
-Authorization: Bearer <private_key>
-```
-
-- **Public bucket reads** (GET, HEAD, LIST) — no authentication required.
-- **All writes** (PUT, DELETE) and **reads on private buckets** — require the bucket key or master key.
-- **Listing buckets** (`GET /`) — master key lists all buckets; bucket key lists only its own bucket.
-- **Presign endpoint** (`POST /presign/...`) — requires the bucket key or master key.
-
-```bash
-# write to a bucket
 curl -X PUT http://localhost:8080/uploads/file.txt \
   -H "Authorization: Bearer uploads-secret" \
-  -d "hello"
+  --data-binary "hello"
 
-# read from a public bucket — no auth needed
 curl http://localhost:8080/uploads/file.txt
-
-# read from a private bucket
-curl http://localhost:8080/permanent/doc.pdf \
-  -H "Authorization: Bearer perm-secret"
-
-# list all buckets — master key sees all
-curl http://localhost:8080/ \
-  -H "Authorization: Bearer your-master-key"
-
-# list buckets — bucket key sees only its own bucket
-curl http://localhost:8080/ \
-  -H "Authorization: Bearer uploads-secret"
 ```
 
----
-
-### Endpoints
-
-| Method   | Path                      | Auth                 | Description                                                        |
-| -------- | ------------------------- | -------------------- | ------------------------------------------------------------------ |
-| `GET`    | `/health`                 | none                 | Returns `{"status":"ok"}`                                          |
-| `GET`    | `/`                       | master or bucket key | List buckets — master key lists all, bucket key lists only its own |
-| `HEAD`   | `/{bucket}`               | read                 | Check if bucket exists — 200 or 404                                |
-| `PUT`    | `/{bucket}`               | write                | S3 compatibility no-op: 200 if bucket exists in config, 404 if not |
-| `GET`    | `/{bucket}`               | read                 | List objects in bucket                                             |
-| `PUT`    | `/{bucket}/{key}`         | write                | Upload object                                                      |
-| `GET`    | `/{bucket}/{key}`         | read                 | Download object                                                    |
-| `HEAD`   | `/{bucket}/{key}`         | read                 | Object metadata — no body                                          |
-| `DELETE` | `/{bucket}/{key}`         | write                | Delete object — returns 204 even if it does not exist              |
-| `POST`   | `/presign/{bucket}/{key}` | write                | Generate a presigned URL (GET or PUT, see `method` query param)    |
-| `POST`   | `/mcp/`                   | per-tool             | MCP Streamable HTTP endpoint                                       |
-
-`PUT /{bucket}` exists purely for S3 client compatibility. boto3 sends a `create_bucket` call before any operation, which maps to this endpoint. HybridS3 treats it as a no-op — no buckets are created or modified.
-
-**Listing objects** accepts `prefix` and `max-keys` query parameters:
-
-```bash
-curl "http://localhost:8080/uploads?prefix=images/&max-keys=50" \
-  -H "Authorization: Bearer uploads-secret"
-```
-
-**Upload** returns an `ETag` header (MD5 of the file content). GET and HEAD also return `ETag`, `Last-Modified`, and `Content-Length`.
-
----
-
-### Object keys
-
-Keys support nested paths using `/`. Parent directories are created automatically on write and pruned when empty on delete.
-
-```bash
-curl -X PUT http://localhost:8080/uploads/reports/2024/january.pdf \
-  -H "Authorization: Bearer uploads-secret" \
-  --data-binary @january.pdf
-```
-
----
-
-### Response format
-
-Requests that include an AWS Sig V4 `Authorization` header receive S3-compatible XML responses. All other requests receive JSON. Error responses include an `"error"` field and a `"request_id"` field.
-
-Every response includes `X-Request-Id` for log correlation and `X-Content-Type-Options: nosniff`.
-
----
-
-## S3 Interface
-
-### Authentication
-
-S3 clients authenticate using AWS Signature V4. The client signs each request using the bucket's `public_key` as `aws_access_key_id` and the bucket's private `key` as `aws_secret_access_key`. The resulting `Authorization` header contains the access key ID in plaintext in the `Credential=` field, and the computed HMAC in `Signature=`. The private key is never transmitted — it is only used locally to compute the signature.
-
-```
-Authorization: AWS4-HMAC-SHA256 Credential=uploads-id/20240101/us-east-1/s3/aws4_request, SignedHeaders=host;x-amz-date, Signature=<hmac>
-```
-
-HybridS3 reads the access key ID from `Credential=`, finds the bucket with that `public_key`, then re-derives the expected signature using that bucket's private key and compares it to the one in the header. The access key ID alone grants nothing — the signature must match.
+boto3, with the bucket's `public_key` as access key ID and its `key` as secret:
 
 ```python
 import boto3
 from botocore.config import Config
 
-# per-bucket client — access is limited to the "uploads" bucket
 s3 = boto3.client(
     "s3",
     endpoint_url="http://localhost:8080",
-    aws_access_key_id="uploads-id",         # public_key from config
-    aws_secret_access_key="uploads-secret",  # key from config
+    aws_access_key_id="uploads-id",
+    aws_secret_access_key="uploads-secret",
     region_name="us-east-1",
     config=Config(signature_version="s3v4"),
 )
-
-# master key client — access to all buckets, can list them
-s3_admin = boto3.client(
-    "s3",
-    endpoint_url="http://localhost:8080",
-    aws_access_key_id="master",              # master_public_key from config
-    aws_secret_access_key="your-master-key", # master_key from config
-    region_name="us-east-1",
-    config=Config(signature_version="s3v4"),
-)
-```
-
----
-
-### Operations
-
-```python
 s3.put_object(Bucket="uploads", Key="file.txt", Body=b"hello")
-s3.get_object(Bucket="uploads", Key="file.txt")
-s3.head_object(Bucket="uploads", Key="file.txt")
-s3.delete_object(Bucket="uploads", Key="file.txt")
-s3.list_objects_v2(Bucket="uploads", Prefix="images/")
-s3_admin.list_buckets()  # master key: returns all buckets
-s3.list_buckets()        # bucket key: returns only the "uploads" bucket
-
-# generate a presigned URL for a private bucket object
-url = s3.generate_presigned_url(
-    "get_object",
-    Params={"Bucket": "permanent", "Key": "doc.pdf"},
-    ExpiresIn=3600,
-)
-
-# presigned URL someone else can use to upload a single key
-put_url = s3.generate_presigned_url(
-    "put_object",
-    Params={"Bucket": "uploads", "Key": "inbox/report.pdf"},
-    ExpiresIn=600,
-)
 ```
 
----
-
-## MCP Interface
-
-An [MCP](https://modelcontextprotocol.io/) server runs at `/mcp/` using the Streamable HTTP transport. AI agents connect via any MCP-compatible client and receive structured tool definitions with typed inputs and outputs.
-
-### Connecting
+MCP, Streamable HTTP at `/mcp/`, with seven tools for uploading, downloading, listing, deleting and presigning:
 
 ```json
 {
@@ -401,409 +94,51 @@ An [MCP](https://modelcontextprotocol.io/) server runs at `/mcp/` using the Stre
 }
 ```
 
-### Authentication
-
-#### Endpoint-level auth
-
-The `/mcp/` endpoint accepts an optional token to authenticate the connection before any tool is invoked. Use the master key for full access, or a bucket key to limit the connection to that bucket's scope. The token is validated against the master key and all bucket keys.
-
-Two methods are accepted:
-
-**Authorization header** — for clients that support custom headers (e.g. Claude Code):
-
-```
-Authorization: Bearer <master_key_or_bucket_key>
-```
-
-**Query parameter** — for clients that cannot set custom headers (e.g. ChatGPT):
-
-```
-http://localhost:8080/mcp/?auth=<master_key_or_bucket_key>
-```
-
-If a token is provided and does not match any known key, the request is rejected with `401`. If no token is provided at all, the request passes through and per-tool auth applies.
-
-#### Per-tool auth
-
-Each tool that operates on a bucket accepts an `auth_key` parameter — the bucket's private `key` or the master key. This is checked independently of endpoint-level auth and controls what each individual tool call is allowed to do.
-
-```
-# public bucket read — no auth_key
-download_object(bucket="uploads", key="file.txt")
-
-# public bucket write — auth_key required
-upload_object(bucket="uploads", key="file.txt", content="hello", auth_key="uploads-secret")
-
-# private bucket — auth_key required for all operations
-download_object(bucket="permanent", key="doc.pdf", auth_key="perm-secret")
-upload_object(bucket="permanent", key="doc.pdf", content="...", auth_key="perm-secret")
-
-# master key lists all buckets; bucket key lists only that bucket
-list_buckets(auth_key="your-master-key")
-list_buckets(auth_key="uploads-secret")  # returns only the uploads bucket
-```
-
-### Tools
-
-| Tool              | Auth required                                   | Description                                                                                                                                  |
-| ----------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `upload_object`   | bucket key or master key                        | Upload text or base64-encoded binary. Content type auto-detected if not specified.                                                           |
-| `download_object` | bucket key or master key (private buckets only) | Download object content. Returns text or base64-encoded binary. Objects over 50 MB cannot be downloaded via MCP — use the HTTP API directly. |
-| `delete_object`   | bucket key or master key                        | Delete an object.                                                                                                                            |
-| `list_objects`    | bucket key or master key (private buckets only) | List objects with optional prefix filter. Default 100 results, max 1000.                                                                     |
-| `list_buckets`    | master key or bucket key                        | Master key lists all buckets. Bucket key lists only that bucket.                                                                             |
-| `object_info`     | bucket key or master key (private buckets only) | Get object metadata (size, content type, ETag, expiry time) without downloading the content.                                                 |
-| `presign_url`     | bucket key or master key                        | Generate a shareable URL. Pass `method="GET"` (default) or `method="PUT"`. GET on a public bucket returns a plain URL; everything else is a signed expiring URL. |
-
-All tools return structured output (`structuredContent`) for clients that support it, with a plain text fallback.
-
----
-
-## Agent integrations
-
-The [skill](.agents/skills/hybrids3) works in any agent that reads `.agents/skills/` (such as [peen](https://github.com/psyb0t/peen)), and installs natively in the clients below.
-
-### Claude Code
-
-```bash
-claude plugin marketplace add psyb0t/agents
-claude plugin install hybrids3@psyb0t
-```
-
-Claude Code prompts for the HybridS3 URL and, if the endpoint requires connection-level auth, the bucket/master key — the key is stored in your OS keychain.
-
-### Codex
-
-```bash
-codex plugin marketplace add psyb0t/agents
-codex plugin add hybrids3@psyb0t
-```
-
-Installed via the marketplace, the skill invokes as `$hybrids3:hybrids3`. Codex also picks the skill up automatically, no install required, in any repo containing `.agents/skills/` — there it invokes as plain `$hybrids3`.
-
-### OpenClaw
-
-The skill is published to ClawHub on every release:
-
-```bash
-openclaw skills install @psyb0t/hybrids3
-```
-
-For MCP clients that speak local stdio, the [`@psyb0t/hybrids3`](.agents/plugins/hybrids3) plugin bridges to the service's `/mcp/` endpoint:
-
-```bash
-openclaw plugins install clawhub:@psyb0t/hybrids3
-```
-
-Then set `HYBRIDS3_URL` (and `HYBRIDS3_KEY` if your endpoint requires connection-level auth).
-
----
-
-## Presigned URLs
-
-Presigned URLs allow anyone with the link to read or write a specific object for a limited time, without sending an `Authorization` header. The `/presign/{bucket}/{key}` endpoint supports two methods via the `method` query parameter:
-
-- `method=GET` (default) — recipient can download the object.
-- `method=PUT` — recipient can upload (overwrite) the object.
-
-A presigned URL is bound to its HTTP verb. A GET URL cannot be used to PUT and vice versa — the signature includes the method in its canonical request.
-
-Expiry range: 1 second to 604800 seconds (7 days). Default: 3600. Expired or tampered URLs return 403.
-
-### Presigned GET
-
-**Private bucket** — generates an AWS Sig V4 presigned URL. The server signs the URL using the bucket's private key, which never appears in the URL. The URL contains the `public_key` in the `Credential=` field and the HMAC in `X-Amz-Signature`.
-
-```bash
-# generate via HTTP endpoint
-curl -X POST "http://localhost:8080/presign/permanent/doc.pdf?expires=3600" \
-  -H "Authorization: Bearer perm-secret"
-
-# response
-{"url": "http://localhost:8080/permanent/doc.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&...&X-Amz-Signature=...", "method": "GET", "expires": 3600}
-```
-
-**Public bucket** — returns a plain URL with no signature and no expiry, since GET on public buckets requires no auth anyway.
-
-```bash
-curl -X POST "http://localhost:8080/presign/uploads/photo.jpg" \
-  -H "Authorization: Bearer uploads-secret"
-
-# response
-{"url": "http://localhost:8080/uploads/photo.jpg", "method": "GET", "expires": null}
-```
-
-### Presigned PUT
-
-Use `method=PUT` to hand someone a URL that lets them upload a specific key without seeing your bucket key. Public buckets are not a shortcut here — anonymous **reads** are allowed, anonymous **writes** never are — so a presigned PUT URL is always signed, even for public buckets.
-
-```bash
-# generate a presigned upload URL
-curl -X POST "http://localhost:8080/presign/uploads/inbox/report.pdf?method=PUT&expires=600" \
-  -H "Authorization: Bearer uploads-secret"
-
-# response
-{"url": "http://localhost:8080/uploads/inbox/report.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&...&X-Amz-Signature=...", "method": "PUT", "expires": 600}
-
-# upload using only the URL — no Authorization header
-curl -X PUT "<url>" --data-binary @report.pdf
-```
-
-The bucket's `max_file_size` is enforced server-side during the upload; oversized bodies are rejected with `413` regardless of how the request was authenticated.
-
-With boto3:
-
-```python
-url = s3.generate_presigned_url(
-    "put_object",
-    Params={"Bucket": "uploads", "Key": "inbox/report.pdf"},
-    ExpiresIn=600,
-)
-# hand `url` to a client; they PUT their bytes to it
-```
-
-Generating a presigned URL requires the bucket's private key or the master key. The resulting URL grants exactly one action (GET or PUT) on exactly one key.
-
-Both the `/presign/` HTTP endpoint and the `presign_url` MCP tool follow this same logic — pass `method="PUT"` to the MCP tool to get an upload URL.
-
----
-
-## MIME Type Detection
-
-Content type is detected automatically on every upload. No `Content-Type` header is required. Detection uses [libmagic](https://man7.org/linux/man-pages/man3/libmagic.3.html) to inspect the first 8 KB of the file content, with a filename extension fallback when libmagic returns a generic type. The detected type is stored in metadata and returned in `Content-Type` on GET and HEAD responses.
-
-To override auto-detection, set `Content-Type` explicitly on the upload request.
-
----
-
-## TTL and Expiry
-
-Set `ttl` on a bucket and objects expire automatically after that duration from the last write. Overwriting an object resets its expiry clock. Setting `ttl: 0` means objects never expire.
-
-```yaml
-buckets:
-  staging:
-    ttl: 1h # objects expire 1 hour after last write
-```
-
-A background cleanup loop runs every `cleanup_interval` seconds and performs two tasks:
-
-1. **TTL expiry** — finds all objects whose `expires_at` has passed and deletes them from disk and metadata.
-2. **Orphan cleanup** — scans each bucket's directory on disk and deletes files that have no corresponding metadata record. This handles files left behind by interrupted uploads.
-
-Empty parent directories are removed up to the bucket root on every deletion.
-
----
-
-## Locking
-
-Every object key gets its own async read-write lock. Multiple readers hold the lock simultaneously. A writer gets exclusive access and blocks all concurrent readers and writers on that key. Locks are acquired before any operation begins and released after the response is fully sent.
-
-This prevents torn reads, partial write visibility, and data corruption under concurrent access.
-
-Three conditions cause `503 Service Unavailable`:
-
-| Condition       | Trigger                                                                  |
-| --------------- | ------------------------------------------------------------------------ |
-| Overloaded      | More than `lock_max_waiters` requests queued for the same key            |
-| Acquire timeout | A request waited `lock_acquire_timeout` seconds without getting the lock |
-| Hold timeout    | A request held the lock longer than `lock_hold_timeout` seconds          |
-
-The hold timeout protects against a slow or stalled upload holding a write lock indefinitely. When it fires, the lock is released and the request receives 503.
-
-The defaults (30s acquire, 300s hold, 100 max waiters) suit large file uploads. For high-throughput small-object workloads, tighten these to shed load faster.
-
----
-
-## Logging
-
-Structured JSON logs to stdout, one entry per line:
-
-```json
-{
-  "ts": "21:05:33",
-  "level": "INFO",
-  "src": "routes:put_object:227",
-  "rid": "4432cd8a4ac1",
-  "msg": "PUT",
-  "bucket": "uploads",
-  "key": "photo.jpg",
-  "size": 48231,
-  "content_type": "image/jpeg"
-}
-```
-
-| Field   | Description                                                     |
-| ------- | --------------------------------------------------------------- |
-| `ts`    | Timestamp (HH:MM:SS)                                            |
-| `level` | `INFO`, `WARNING`, or `ERROR`                                   |
-| `src`   | `module:function:line`                                          |
-| `rid`   | Request ID — matches the `X-Request-Id` response header         |
-| `msg`   | Event name                                                      |
-| others  | Context-specific: `bucket`, `key`, `size`, `content_type`, etc. |
-
-The request ID appears in every log line produced during a request, making it easy to trace a single request end-to-end. Exceptions are logged with full tracebacks.
-
----
-
-## Behind a Reverse Proxy
-
-Set `path_prefix` in config to match the proxy location. HybridS3 serves all routes under that prefix natively — nginx forwards the path as-is, no stripping required. SigV4 signatures work because the client's signed path matches what the server sees.
-
-```yaml
-# config.yaml
-path_prefix: /storage
-```
-
-```nginx
-# ✅ CORRECT — no URI in proxy_pass, nginx forwards full path as-is
-location /storage {
-    proxy_pass http://hybrids3:8080;
-    proxy_set_header Host $http_host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-
-# ❌ WRONG — trailing slash in proxy_pass is a URI, nginx strips /storage/
-# location /storage/ {
-#     proxy_pass http://hybrids3:8080/;   <-- this "/" is a URI, causes stripping
-# }
-#
-# ❌ WRONG — $host strips the port, SigV4 signs Host: yourdom:4000
-# but nginx sends Host: yourdom → signature mismatch
-# proxy_set_header Host $host;   <-- use $http_host instead
-```
-
-The key: `proxy_pass http://backend:8080;` (no trailing `/`) forwards the full path. `proxy_pass http://backend:8080/;` (trailing `/`) tells nginx to replace the location prefix — that strips `/storage/` and breaks SigV4.
-
-With this config:
-
-```bash
-# boto3
-s3 = boto3.client("s3", endpoint_url="http://yourdomain/storage", ...)
-
-# curl
-curl http://yourdomain/storage/uploads/file.txt
-
-# MCP
-{"url": "http://yourdomain/storage/mcp/"}
-```
-
-When `path_prefix` is set, all endpoints move under it — including health (`/storage/health`).
-
----
-
-## Security
-
-- **AWS Sig V4 verification** — full signature verification for header auth and presigned URLs; expired or tampered presigned URLs return 403
-- **Constant-time key comparison** — all credential checks use `hmac.compare_digest` to prevent timing attacks
-- **Private key isolation** — the private `key` is never returned in any response, never embedded in presigned URLs, and never logged
-- **Path traversal protection** — all object key paths are validated with `Path.relative_to` before any disk access; upload attempts with traversal keys return 400
-- **Bucket enumeration prevention** — `GET /` requires a valid key; master key lists all buckets, bucket key lists only its own; unauthorized or non-existent bucket access always returns 404 — callers cannot distinguish "does not exist" from "you don't have access"
-- **SQLite prefix injection prevention** — user-supplied `prefix` values are escaped before use in `LIKE` queries
-- **Atomic writes** — objects are written to a temporary file and renamed into place; readers never see partial writes
-- **Streaming uploads** — request bodies are streamed directly to disk without buffering the full body in memory
-- **Orphan file cleanup** — files on disk with no metadata record are deleted by the background sweep
-- **Per-key RW locking** — overloaded or timed-out requests get 503 rather than queuing indefinitely
-- **MCP error masking** — internal error details are not exposed to MCP tool callers
-- **MCP download cap** — objects over 50 MB cannot be downloaded via MCP; use the HTTP API directly
-- **Non-root container** — runs as UID 1000
-- **`X-Content-Type-Options: nosniff`** — on every response
-
----
-
-## Testing
-
-```bash
-# build prod image + run unit tests in the dev container + run integration suite
-make test
-
-# run a single integration test by name
-./test.sh test_s3_presigned_private
-
-# list all available test names
-./test.sh --help
-
-# unit tests only, inside the dev container
-make test-unit
-```
-
-All test output is teed to `test.log` automatically.
-
-The integration tests cover: HTTP API, S3/boto3 compatibility, MCP tools, Bearer auth, AWS Sig V4 auth, presigned URLs (HTTP endpoint and S3 SDK, GET and PUT), master key, cross-bucket key isolation, TTL expiry, orphan cleanup, MIME detection, size limits, path traversal attempts, binary files, concurrent reads and writes, RW lock behavior at unit and HTTP level, request IDs, and security headers.
-
----
+There is also an agent skill and plugin for Claude Code, Codex and OpenClaw; see [Agent integrations](https://psyb0t.github.io/docker-hybrids3/agent-integrations/).
+
+## Documentation
+
+The full documentation lives at **https://psyb0t.github.io/docker-hybrids3/**.
+
+| Page | What it covers |
+| --- | --- |
+| [Running the container](https://psyb0t.github.io/docker-hybrids3/deployment/) | Tags, mounts, Compose, file ownership, upgrades, backups |
+| [Configuration](https://psyb0t.github.io/docker-hybrids3/configuration/) | Every `config.yaml` setting with defaults and formats |
+| [Keys and access](https://psyb0t.github.io/docker-hybrids3/keys-and-access/) | Bucket key pairs, the master key, public and private buckets |
+| [HTTP API](https://psyb0t.github.io/docker-hybrids3/http-api/) | Routes, headers, status codes and error codes |
+| [S3 API](https://psyb0t.github.io/docker-hybrids3/s3-api/) | Signature V4, boto3, aws-cli and supported operations |
+| [MCP server](https://psyb0t.github.io/docker-hybrids3/mcp/) | Client setup, auth layers and every tool |
+| [Presigned URLs](https://psyb0t.github.io/docker-hybrids3/presigned-urls/) | Time-limited GET and PUT links |
+| [Storage, expiry and locking](https://psyb0t.github.io/docker-hybrids3/storage/) | MIME detection, TTL, cleanup and per-object locks |
+| [Behind a reverse proxy](https://psyb0t.github.io/docker-hybrids3/reverse-proxy/) | `path_prefix`, nginx and https presigned URLs |
+| [Agent integrations](https://psyb0t.github.io/docker-hybrids3/agent-integrations/) | Skill and plugins for Claude Code, Codex and OpenClaw |
+| [Security](https://psyb0t.github.io/docker-hybrids3/security/) | What is protected, known gaps, checklist before exposing it |
+| [Troubleshooting](https://psyb0t.github.io/docker-hybrids3/troubleshooting/) | Log format, startup errors and common failures |
+| [Architecture](https://psyb0t.github.io/docker-hybrids3/architecture/) | Modules and the path of a request |
+| [Development](https://psyb0t.github.io/docker-hybrids3/development/) | Dev container, tests, dependencies, CI and releases |
 
 ## Development
 
-All development tooling lives inside a sandboxed dev container so the host stays clean and supply-chain blast radius is contained. The host only needs `docker`, `make`, `git`, and a shell — no Python interpreter, no `pip`, no `uv`, no project deps installed globally.
+All tooling runs in a sandboxed dev container, so the host needs only Docker, Make, Bash and curl.
 
 ```bash
-# one-time: build the dev container (also rebuilds when uv.lock changes)
-make dev-image
-
-# drop into a shell with the full dev env on PATH
-make shell
-
-# lint + format + unit tests — all run in the dev container
-make lint
-make format
-make test-unit
+make help       # every target
+make lint       # flake8 + mypy
+make test       # production image, unit tests and the integration suite
+make build      # production image
+make docs       # build the documentation site locally
 ```
 
-### Dependency management
-
-The project uses [`uv`](https://docs.astral.sh/uv/) with a hash-locked `uv.lock` (committed) and a supply-chain age gate (`[tool.uv] exclude-newer` in `pyproject.toml`) that refuses to install any package version published after a fixed date. Every dep mutation bumps that date to **3 days ago** in the same commit, then re-locks.
-
-| Target | What it does | Bumps age gate? |
-|---|---|---|
-| `make pkg-lock` | Refresh `uv.lock` under the current gate | No |
-| `make pkg-add PKG=name[==ver]` | Add a package | Yes |
-| `make pkg-remove PKG=name` | Remove a package | Yes |
-| `make pkg-update PKG=name` | Upgrade one package | Yes |
-| `make pkg-upgrade` | Upgrade every package | Yes |
-
-Never run `uv` directly — every supported mutation has a Make target so the gate stays anchored.
-
-### Production image
-
-`make build` produces the production image. The Dockerfile is multi-stage, pins both the Python base and `uv` by `@sha256` digest, installs with `uv sync --frozen --no-dev` (lockfile-verified, no dev deps), and copies only the resulting venv + app source into the runtime stage. There is no `pip` invocation anywhere in this project.
-
----
-
-## Architecture
-
-```
-app/
-  main.py          FastAPI app, lifespan management, request ID middleware, MCP mount
-  config.py        YAML config loader — TTL durations, sizes, key pairs, lock settings
-  routes.py        HTTP and S3 endpoint handlers, presign endpoint
-  lock.py          Per-key async read-write lock with acquire/hold timeouts and overload cap
-  mcp_server.py    MCP tool definitions — Streamable HTTP at /mcp/
-  auth.py          Bearer token and AWS Sig V4 authentication (header and presigned)
-  sigv4.py         AWS Signature V4 signing and verification
-  db.py            SQLite metadata store — WAL mode, objects table with TTL tracking
-  storage.py       File I/O, path validation, atomic writes, orphan detection
-  mimetype.py      Content type detection — libmagic content sniff with extension fallback
-  s3xml.py         S3 XML response builders for list, error, and location responses
-  logger.py        JSON structured logging with per-request ID propagation via contextvars
-  scheduler.py     Background loop for TTL expiry and orphan file cleanup
-```
-
----
+Dependency changes go through `make pkg-add`, `pkg-remove`, `pkg-update` and `pkg-upgrade`, which move the supply-chain age gate in [`pyproject.toml`](https://github.com/psyb0t/docker-hybrids3/blob/main/pyproject.toml) together with the lockfile. [Development](https://psyb0t.github.io/docker-hybrids3/development/) has the details, and [`AGENTS.md`](https://github.com/psyb0t/docker-hybrids3/blob/main/AGENTS.md) is the guide for coding agents.
 
 ## Limitations
 
-- No multipart upload (S3's chunked upload protocol)
-- No object versioning
-- No ACLs beyond bucket-level public/private
-- No bucket creation or deletion via API — buckets are defined in config
-- No CORS headers — add these at the reverse proxy layer if needed
-- No replication
-- No encryption at rest
+No multipart upload, no object versioning, no ACLs beyond bucket-level public/private, no bucket creation or deletion through the API, no CORS headers, no replication and no encryption at rest. Listings stop at 1000 objects.
 
----
+## Sponsor
+
+<a href="https://www.buymeacoffee.com/psyb0t"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me a Coffee" height="60" width="217"></a>
 
 ## License
 
-[WTFPL](LICENSE)
+[WTFPL](https://github.com/psyb0t/docker-hybrids3/blob/main/LICENSE)

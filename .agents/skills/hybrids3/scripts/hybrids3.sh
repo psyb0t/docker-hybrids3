@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Thin curl wrapper for the hybrids3 plain HTTP API — put / get / list / delete
+# Thin curl wrapper for the hybrids3 plain HTTP API: put / get / list / delete
 # objects and list buckets against a running instance. S3-SDK and MCP callers
 # don't need this; it exists so shell users don't hand-write Bearer headers.
 #
 # Usage:
 #   hybrids3.sh put     <bucket> <key> <local-file> [content-type]
 #   hybrids3.sh get     <bucket> <key> [out-file]        # object bytes → stdout if out-file omitted
-#   hybrids3.sh info    <bucket> <key>                   # HEAD — metadata headers only
+#   hybrids3.sh info    <bucket> <key>                   # HEAD: metadata headers only
 #   hybrids3.sh list    <bucket> [prefix] [max-keys]
 #   hybrids3.sh delete  <bucket> <key>
 #   hybrids3.sh buckets                                  # list buckets (master key → all)
@@ -16,7 +16,7 @@
 # Environment:
 #   HYBRIDS3_URL   Base URL of the instance (default: http://localhost:8080).
 #                  Include any reverse-proxy path prefix, e.g. http://host/storage.
-#   HYBRIDS3_KEY   Bearer token — a bucket's private key, or the master key.
+#   HYBRIDS3_KEY   Bearer token: a bucket's private key, or the master key.
 #                  Required for writes, private-bucket reads, presign, and the
 #                  buckets command. Public-bucket reads work without it.
 #   LOG_FILE       Where diagnostic (stderr) log lines are tee'd (default: /tmp/hybrids3.log).

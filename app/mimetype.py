@@ -1,10 +1,12 @@
 import mimetypes
 from pathlib import Path
+from typing import Any
 
 from logger import get_logger
 
 log = get_logger(__name__)
 
+_magic: Any = None
 try:
     import magic
 

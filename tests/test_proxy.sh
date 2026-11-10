@@ -97,7 +97,7 @@ _run_s3_proxy() {
     local public_key="$1"
     local secret_key="$2"
     shift 2
-    python3 -c "
+    py -c "
 import boto3, json, sys
 from botocore.config import Config as BotoConfig
 s3 = boto3.client(
@@ -267,7 +267,7 @@ test_proxy_http_presign() {
     resp=$(curl -s -X POST "$PROXY_BASE/presign/private-bucket/proxy-httpps.txt?expires=60" \
         -H "Authorization: Bearer priv-key")
     local url
-    url=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['url'])")
+    url=$(echo "$resp" | py -c "import sys,json; print(json.load(sys.stdin)['url'])")
 
     # URL should contain the proxy prefix
     if ! echo "$url" | grep -q "/storage/"; then

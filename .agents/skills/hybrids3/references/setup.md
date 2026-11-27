@@ -22,7 +22,7 @@ Grab the example config, edit keys + buckets, run:
 ```bash
 # fetch the example config
 wget -O config.yaml \
-  https://raw.githubusercontent.com/psyb0t/docker-hybrids3/master/config.example.yaml
+  https://raw.githubusercontent.com/psyb0t/docker-hybrids3/main/config.example.yaml
 
 # edit it: set master_key and each bucket's key
 vi config.yaml
@@ -38,7 +38,7 @@ docker run -d --name hybrids3 \
 curl http://localhost:8080/health      # → {"status":"ok"}
 ```
 
-**`-p 8080:8080` binds all interfaces**: the service becomes reachable from the network, not just localhost. Use `-p 127.0.0.1:8080:8080` (loopback-only) unless remote access is intentionally required, matching the fleet convention.
+**`-p 8080:8080` binds all interfaces**: the service becomes reachable from the network, not just localhost. Use `-p 127.0.0.1:8080:8080` (loopback-only) unless remote access is intentionally required.
 
 ### docker-compose
 
@@ -57,9 +57,9 @@ volumes:
   hybrids3-data:
 ```
 
-**`"127.0.0.1:8080:8080"` binds loopback-only.** Use `"8080:8080"` only if remote access is intentionally required, matching the fleet convention above. For a real deployment where other hosts or services need to reach it, put hybrids3 on an internal Docker network and front it with a reverse proxy (see [Behind a Reverse Proxy](#behind-a-reverse-proxy)) rather than publishing the port on all interfaces.
+**`"127.0.0.1:8080:8080"` binds loopback-only.** Use `"8080:8080"` only if remote access is intentionally required. For a real deployment where other hosts or services need to reach it, put hybrids3 on an internal Docker network and front it with a reverse proxy (see [Behind a Reverse Proxy](#behind-a-reverse-proxy)) rather than publishing the port on all interfaces.
 
-**Uploads to a `public: true` bucket are world-readable.** Any bucket with `public: true` serves GET/HEAD/LIST with no authentication at all. Anyone who can reach the port can read anything stored there. Don't put sensitive data in a public bucket, and keep the port bound to loopback (or behind an authenticating proxy) unless that's the intended exposure.
+**A `public: true` bucket needs no authentication for reads.** It serves GET/HEAD/LIST to anyone who can reach the port, so everything stored there can be read. Don't put sensitive data in a public bucket, and keep the port bound to loopback (or behind an authenticating proxy) unless that's the intended exposure.
 
 ## Configuration
 
@@ -81,7 +81,7 @@ Per-bucket fields (under `buckets:`, keyed by bucket name; the name must not con
 
 | Field | Default | What it does |
 |---|---|---|
-| `key` | **required** | Private key: Bearer token (HTTP/MCP) + `aws_secret_access_key` (S3). Never transmitted. Keep secret. |
+| `key` | **required** | Private key: Bearer token (HTTP/MCP) + `aws_secret_access_key` (S3). Over S3 it only signs and is not sent; over HTTP and MCP it is sent as the Bearer token or `auth_key`, so use TLS beyond loopback. Keep secret. |
 | `public` | `false` | `true` = anyone reads (GET/HEAD/LIST) without auth; writes still need a key. `false` = auth for everything. |
 | `public_key` | bucket name | Public `aws_access_key_id`; appears in presigned `Credential=`. Safe to share. |
 | `ttl` | `0` | Objects expire this long after last write (overwrite resets). `0` = never. Formats: `30s 5m 1h 1h30m12s 1d 2d12h`. |
@@ -161,7 +161,7 @@ location /storage {
 }
 ```
 
-Then clients use the prefixed URL: `HYBRIDS3_URL=http://yourdomain/storage`, boto3 `endpoint_url="http://yourdomain/storage"`, MCP `http://yourdomain/storage/mcp/`.
+Terminate TLS at the proxy (a `listen 443 ssl` server block with your certificate) so keys and object data do not cross the network in clear text. Then clients use the prefixed URL: `HYBRIDS3_URL=https://yourdomain/storage`, boto3 `endpoint_url="https://yourdomain/storage"`, MCP `https://yourdomain/storage/mcp/`.
 
 A trailing slash in `proxy_pass` (`http://hybrids3:8080/`) strips the prefix and breaks SigV4, so don't. `$host` drops the port and also breaks SigV4, so use `$http_host`.
 

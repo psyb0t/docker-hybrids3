@@ -1,7 +1,6 @@
 ---
 title: "Running the container"
 description: "Run the psyb0t/hybrids3 image with docker run or Compose: tags, the config and data mounts, UID 1000 ownership, health checks, upgrades and backups."
-nav_order: 2
 ---
 
 # Running the container

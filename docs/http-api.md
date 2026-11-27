@@ -1,7 +1,6 @@
 ---
 title: "HTTP API"
 description: "Every hybrids3 HTTP route with its auth, query parameters, response headers, status codes, JSON and XML error formats and error codes."
-nav_order: 5
 ---
 
 # HTTP API

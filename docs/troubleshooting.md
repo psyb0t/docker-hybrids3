@@ -1,7 +1,6 @@
 ---
 title: "Troubleshooting"
 description: "Read hybrids3 JSON logs, fix each startup error, and track down 404s, 503s, signature mismatches, wrong content types and failed SDK calls."
-nav_order: 13
 ---
 
 # Troubleshooting

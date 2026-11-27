@@ -1,11 +1,12 @@
 ---
 name: hybrids3
-description: Self-hosted lightweight object storage speaking three interfaces at once: the S3 API (boto3 / AWS-SDK compatible, AWS Sig V4), a plain HTTP API (curl-friendly, Bearer auth), and MCP (Streamable HTTP tools for agents). Buckets/objects with SQLite metadata and flat-file storage on disk; buckets are config-defined (no create/delete API), each with a public/private flag, a private key + public key pair, optional TTL expiry, and a max upload size. Auth is per-bucket keys plus a cross-bucket master key; presigned GET/PUT URLs for handing out single-object access. Use when the user wants to put/get/list/delete files in a self-hosted S3-compatible store, generate presigned upload/download links, drive their own boto3-compatible object storage, or connect an agent to object storage over MCP.
+description: "Self-hosted lightweight object storage speaking three interfaces at once: the S3 API (boto3 / AWS-SDK compatible, AWS Sig V4), a plain HTTP API (curl-friendly, Bearer auth), and MCP (Streamable HTTP tools for agents). Buckets/objects with SQLite metadata and flat-file storage on disk; buckets are config-defined (no create/delete API), each with a public/private flag, a private key + public key pair, optional TTL expiry, and a max upload size. Auth is per-bucket keys plus a cross-bucket master key; presigned GET/PUT URLs for handing out single-object access. Use when the user wants to put/get/list/delete files in a self-hosted S3-compatible store, generate presigned upload/download links, drive their own boto3-compatible object storage, or connect an agent to object storage over MCP. Also covers running a local instance with Docker."
 homepage: https://github.com/psyb0t/docker-hybrids3
 user-invocable: true
 permissions:
-  - "network: outbound HTTP(S) to the configured HYBRIDS3_URL object-storage endpoint"
-  - "object storage: read/write/delete objects (upload, download, list, delete) and generate presigned GET/PUT URLs, scoped to whatever bucket key is provided"
+  network: "HTTP(S) requests to the user-provided HYBRIDS3_URL only. Requests carry the bucket key or master key in an Authorization header (or as an MCP auth_key argument) plus the object bytes being uploaded or downloaded. Use https:// for any non-loopback URL. Docker pulls psyb0t/hybrids3 from Docker Hub when the user sets up a local instance."
+  shell: "curl and the bundled scripts/hybrids3.sh helper against HYBRIDS3_URL. The optional local-instance setup uses docker run or docker compose, and the optional MCP setup uses claude mcp add."
+  filesystem: "Reads local files the user names for upload and writes downloads to the output path the user names. The helper appends log lines to /tmp/hybrids3.log (LOG_FILE). Local-instance setup writes a config.yaml in the directory the user chooses."
 metadata:
   { "openclaw": { "emoji": "🪣", "primaryEnv": "HYBRIDS3_URL", "requires": { "bins": ["docker", "curl"] } } }
 ---
@@ -22,11 +23,12 @@ For installation, configuration, and container setup, see [references/setup.md](
 
 ## Security & safety
 
-- **Public buckets are world-readable.** A bucket with `public: true` serves `GET`/`HEAD`/`LIST` to anyone who can reach the port, with no auth at all. Only store data there that's meant to be openly readable; keep sensitive data in a `public: false` bucket.
-- **Bind loopback, not all interfaces.** The container listens on `8080`. Publishing it as `-p 8080:8080` / compose `"8080:8080"` makes it reachable from the network by default. Use `-p 127.0.0.1:8080:8080` (loopback) unless remote access is intentionally required, and for real deployments put the service on an internal Docker network behind a reverse proxy instead of exposing the port directly. See [references/setup.md](references/setup.md#quick-install) and [Behind a Reverse Proxy](references/setup.md#behind-a-reverse-proxy).
-- **`DELETE`, presigned `PUT`, and MCP `delete_object` are destructive & irreversible.** There's no undo, no versioning, no recycle bin. A deleted object (or one overwritten via `PUT`) is gone. An agent must NEVER call `DELETE` / `delete_object`, or generate/use a presigned `PUT` that overwrites, unless the user explicitly asked for that exact key to be removed or replaced; confirm the specific bucket + key first, never enumerate-then-bulk-delete, and treat bulk cleanup as requiring explicit per-object user confirmation.
-- **Bucket keys, master key, and presigned URLs are bearer credentials.** Whoever holds a bucket's private `key` or the `master_key` (or a live presigned URL) can act as that bucket/master until the credential is rotated or the URL expires. There's no per-caller revocation. Never paste these into shared prompts, logs, or presigned URLs handed to untrusted parties beyond the one object they're meant to grant.
-- **This skill is a consumer, not an operator.** It talks to an instance the user already runs; it doesn't provision, harden, or expose the server. Don't use this skill to reconfigure `config.yaml`, change bucket visibility, or alter port bindings on the user's behalf without being explicitly asked.
+- **Public buckets need no auth for reads.** A bucket with `public: true` serves `GET`/`HEAD`/`LIST` to anyone who can reach the port. Store only data meant to be openly readable there; keep sensitive data in a `public: false` bucket.
+- **Bind loopback, not all interfaces.** The container listens on `8080`. Publishing it as `-p 8080:8080` / compose `"8080:8080"` makes it reachable from the network. Use `-p 127.0.0.1:8080:8080` unless remote access is intended, and for real deployments put the service on an internal Docker network behind a TLS reverse proxy. See [references/setup.md](references/setup.md#quick-install) and [Behind a Reverse Proxy](references/setup.md#behind-a-reverse-proxy).
+- **Deletes and overwrites are irreversible.** `DELETE`, S3 `delete_object`, MCP `delete_object`, the helper's `delete` command, and a `PUT` or presigned `PUT` onto an existing key have no undo, no versioning and no recycle bin. Act only on the bucket and key the task owns, and only when the user asked for that specific delete or overwrite. Do not list objects and then delete them in bulk.
+- **Where data goes.** Every request goes to the host in `HYBRIDS3_URL` and nowhere else. That host receives the object bytes, the bucket key or master key (in the `Authorization` header, or as the MCP `auth_key` argument), and the object keys. hybrids3 speaks plain HTTP, so use `http://` only for `localhost` or a protected internal network, and `https://` through a TLS proxy for anything else.
+- **Keys and presigned URLs are bearer credentials.** Whoever holds a bucket `key`, the `master_key` or a live presigned URL can act as that bucket (or the master) until the key is rotated or the URL expires. There is no per-caller revocation. Do not print them, log them or paste them into shared prompts, and hand a presigned URL only to the one recipient it is for. Read keys from the environment variables below, never from the server's `config.yaml`.
+- **This skill is a consumer, not an operator.** It talks to an instance the user already runs. Do not reconfigure `config.yaml`, change bucket visibility or alter port bindings unless the user asks.
 
 ## When To Use
 
@@ -52,7 +54,7 @@ For installation, configuration, and container setup, see [references/setup.md](
 The container should already be running. Point the skill at it:
 
 ```bash
-export HYBRIDS3_URL=http://localhost:8080
+export HYBRIDS3_URL=http://localhost:8080   # use https:// for any non-loopback host
 ```
 
 **Verify:** `curl $HYBRIDS3_URL/health` returns `{"status":"ok"}`.
@@ -85,7 +87,7 @@ They share one SQLite metadata store and one flat-file tree, so an object writte
 
 ## S3 API
 
-S3 clients authenticate with **AWS Signature V4**. The bucket's `public_key` is the `aws_access_key_id` (travels in the request in plaintext, in the `Credential=` field); the bucket's private `key` is the `aws_secret_access_key` (used only to compute the HMAC locally, never transmitted). `region_name` is required by SDKs but the value is arbitrary; use `us-east-1`.
+S3 clients authenticate with **AWS Signature V4**. The bucket's `public_key` is the `aws_access_key_id` (travels in the request in plaintext, in the `Credential=` field); the bucket's private `key` is the `aws_secret_access_key` (S3 clients use it only to compute the HMAC locally and do not send it). `region_name` is required by SDKs but the value is arbitrary; use `us-east-1`.
 
 ```
 Authorization: AWS4-HMAC-SHA256 Credential=uploads-id/20240101/us-east-1/s3/aws4_request, SignedHeaders=host;x-amz-date, Signature=<hmac>
@@ -125,7 +127,7 @@ put_url = s3.generate_presigned_url(
 
 For cross-bucket access or `list_buckets()` returning **all** buckets, build a second client with the **master** credentials (`aws_access_key_id=master_public_key`, `aws_secret_access_key=master_key`). Don't embed the master key in client-facing code; per-bucket keys scope access to one bucket.
 
-**Destructive & irreversible.** `delete_object` deletes the object with no undo: no versioning, no recycle bin. An agent must NEVER call it unless the user explicitly asked for that exact key to be deleted; confirm the specific bucket + key first, scope it to the current task, and never enumerate-then-bulk-delete. On a shared instance where multiple callers use the same bucket, this can destroy another caller's data, so treat bulk deletes as admin-only and requiring explicit confirmation.
+`delete_object` is irreversible; see [Security & safety](#security--safety).
 
 ### aws-cli
 
@@ -155,7 +157,7 @@ Requests carrying an AWS Sig V4 `Authorization` header get S3-style XML back; ev
 | `GET` | `/{bucket}` | read | List objects. Query: `prefix`, `max-keys`. |
 | `POST` | `/presign/{bucket}/{key}` | write | Generate a presigned URL. Query: `method` (`GET` default / `PUT`), `expires` (seconds, 1 to 604800, default 3600). |
 
-**Destructive & irreversible.** `DELETE` removes the object with no undo. An agent must NEVER call it unless the user explicitly asked for that exact key to be deleted; confirm the specific bucket + key first, scope it to the current task, and never enumerate-then-bulk-delete. On a shared bucket used by other callers, this can destroy their data, so treat it as admin-only.
+`DELETE` is irreversible; see [Security & safety](#security--safety).
 
 ```bash
 # upload
@@ -249,7 +251,7 @@ claude mcp add --transport http hybrids3 "$HYBRIDS3_URL/mcp/" \
 
 ### Auth (two layers)
 
-**Endpoint-level (optional)**: a token that authenticates the *connection* before any tool runs. Any valid key (master or bucket) is accepted; it does not grant or limit anything inside the tools, which per-tool auth decides. Send it as `Authorization: Bearer <key>`, or (for clients that can't set headers) as `?auth=<key>` on the URL. A token that matches nothing → `401`; **no token → passes through**, and per-tool auth applies. When the server sets `path_prefix`, the token check is skipped entirely.
+**Endpoint-level (optional)**: a token that authenticates the *connection* before any tool runs. Any valid key (master or bucket) is accepted; it does not grant or limit anything inside the tools, which per-tool auth decides. Send it as `Authorization: Bearer <key>`, or (for clients that can't set headers) as `?auth=<key>` on the URL, which puts the key in URLs and proxy logs, so prefer the header. A token that matches nothing → `401`; **no token → passes through**, and per-tool auth applies. When the server sets `path_prefix`, the token check is skipped entirely.
 
 **Per-tool**: every tool that touches a bucket takes an `auth_key` argument (the bucket's private `key` or the master key), checked independently of the connection token. Public-bucket reads (`download_object`, `list_objects`, `object_info`) accept an empty `auth_key`; all writes and all private-bucket ops require it.
 
@@ -265,7 +267,7 @@ claude mcp add --transport http hybrids3 "$HYBRIDS3_URL/mcp/" \
 | `object_info` | `bucket`, `key`, `auth_key=""` | key on private only | Metadata only (size, content_type, etag, uploaded_at, expires_at). |
 | `presign_url` | `bucket`, `key`, `auth_key`, `method="GET"`, `expires=3600`, `base_url=""`, `host=""` | bucket/master key | `method` GET/PUT. Same public-GET-plain / everything-else-signed logic as the HTTP endpoint. `expires` clamped to 1 to 604800. Set `base_url` to the externally-reachable URL so the link is usable. |
 
-**`delete_object` is destructive & irreversible.** It deletes the object with no undo. An agent must NEVER call it unless the user explicitly asked for that exact key to be deleted; confirm the specific bucket + key first, never enumerate-then-bulk-delete. On a shared bucket used by other callers, this can destroy their data, so treat it as admin-only.
+`delete_object` is irreversible; see [Security & safety](#security--safety).
 
 All tools return `structuredContent` with a plain-text fallback. Internal error details are masked.
 
@@ -314,7 +316,7 @@ Responses arrive as server-sent events; the JSON-RPC result is on the `data:` li
 
 | Credential | Config field | Role | Keep secret? |
 |---|---|---|---|
-| Bucket private key | `key` | Bearer token (HTTP/MCP) **and** `aws_secret_access_key` (S3). Signs/verifies, never transmitted. | **Yes** |
+| Bucket private key | `key` | Bearer token (HTTP/MCP) **and** `aws_secret_access_key` (S3). Over S3 it only signs and is not sent. Over HTTP and MCP it is sent to the server as the Bearer token or `auth_key`. | **Yes** |
 | Bucket public key | `public_key` | `aws_access_key_id` (S3) + `Credential=` in presigned URLs. Identifies, grants nothing. Defaults to bucket name. | No |
 | Master key | `master_key` | Cross-bucket god key. Works on every bucket + only credential that lists all buckets. | **Yes** |
 | Master public key | `master_public_key` | `aws_access_key_id` paired with the master key (S3). Defaults to `"master"`. | No |

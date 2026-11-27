@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.3.11], 2026-11-27
+
+- The agent skill now says where data goes and what cannot be undone. Requests go only to the host in `HYBRIDS3_URL`, which receives the keys and the object bytes, so anything beyond localhost should use `https://` through a TLS proxy. It describes deletes and overwrites as irreversible and limits them to the key the user named. Its frontmatter declares the network, shell and filesystem use.
+- `scripts/hybrids3.sh info` exits 1 and prints the response headers to stderr when the server answers with a non-2xx status. It used to exit 0 on a 404.
+- The copy of the skill published to ClawHub names the exact release image by digest, and its raw GitHub links to `main` point at the release tag. The repository files keep `latest` and `main`.
+- The setup reference fetches `config.example.yaml` from `main`, because the `master` link did not exist, and shows the reverse proxy terminating TLS.
+- The documentation site is built with Docusaurus instead of Jekyll, at the same page addresses. `make docs` builds it in a pinned Node container and fails on a broken link or anchor, `make docs-lock` refreshes its lockfile, and a docs workflow publishes it to GitHub Pages.
+- A tag's image promotion no longer repeats the vulnerability scan or the Docker Hub description update that the `main` run already did, and the image job states its Docker Hub visibility and description settings.
+- The rules in `.agents/rules/` keep only conventions specific to this repository.
+
 ## [v0.3.10], 2026-11-10
 
 - The documentation is published at https://psyb0t.github.io/docker-hybrids3/. The configuration, HTTP, S3 and MCP API, keys and access, presigned URL, storage, deployment, reverse proxy, security, troubleshooting and development reference moved there from the README.

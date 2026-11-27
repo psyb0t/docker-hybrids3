@@ -1,7 +1,6 @@
 ---
 title: "Presigned URLs"
 description: "Hand out time-limited hybrids3 links that let someone download or upload one object without a key, from the HTTP endpoint, the MCP tool or boto3."
-nav_order: 8
 ---
 
 # Presigned URLs

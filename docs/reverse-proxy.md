@@ -1,7 +1,6 @@
 ---
 title: "Behind a reverse proxy"
 description: "Serve hybrids3 under a path prefix behind nginx without breaking AWS Signature V4, and get https presigned URLs with FORWARDED_ALLOW_IPS."
-nav_order: 10
 ---
 
 # Behind a reverse proxy

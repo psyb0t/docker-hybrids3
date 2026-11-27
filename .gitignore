@@ -17,3 +17,6 @@ git-update.sh
 
 # Review receipt for the local release script.
 git-update.sh.debot
+/website/node_modules/
+/website/.docusaurus/
+/website/build/

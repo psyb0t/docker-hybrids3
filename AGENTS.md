@@ -54,7 +54,8 @@ Request path for an upload: client -> `RequestIdMiddleware` -> `McpAuthMiddlewar
 | `test.sh`, `tests/common.sh` | Integration runner and its shared helpers |
 | `tests/test_*.sh` | Integration tests, each registered in `ALL_TESTS` |
 | `tests/test_lock_unit.py` | pytest unit tests for `app/lock.py` |
-| `docs/` | The documentation site (GitHub Pages, Jekyll, Just the Docs) |
+| `docs/` | The documentation pages |
+| `website/` | The Docusaurus site that builds `docs/` for GitHub Pages |
 | `.agents/skills/hybrids3/` | The agent skill, its `references/setup.md` and the `scripts/hybrids3.sh` curl helper |
 | `.agents/plugins/hybrids3/` | The OpenClaw stdio-to-HTTP MCP bridge plugin (MIT) |
 | `.agents/.claude-plugin/`, `.agents/.codex-plugin/` | Claude Code and Codex plugin manifests |
@@ -75,7 +76,8 @@ make test-unit   # pytest tests/test_lock_unit.py in the dev container
 make test        # production image + unit tests + integration suite (what CI runs)
 make build       # production image psyb0t/hybrids3:latest
 make run         # run it locally with ./config.yaml, then make logs / make stop
-make docs        # build the docs site with the GitHub Pages image
+make docs        # build the Docusaurus site into website/build (fails on broken links)
+make docs-lock   # refresh website/pnpm-lock.yaml
 make pkg-add PKG=name==1.2.3   # dependency changes go through pkg-* targets only
 ```
 

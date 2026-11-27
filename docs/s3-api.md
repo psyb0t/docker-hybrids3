@@ -1,7 +1,6 @@
 ---
 title: "S3 API"
 description: "Use boto3, aws-cli or any AWS SDK with hybrids3: Signature V4 credentials, supported S3 operations, listing limits and operations that are missing."
-nav_order: 6
 ---
 
 # S3 API

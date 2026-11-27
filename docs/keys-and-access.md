@@ -1,7 +1,6 @@
 ---
 title: "Keys and access"
 description: "How hybrids3 authenticates: per-bucket private and public keys, the cross-bucket master key, public versus private buckets, and the 404 for hidden buckets."
-nav_order: 4
 ---
 
 # Keys and access

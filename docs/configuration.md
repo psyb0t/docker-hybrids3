@@ -1,7 +1,6 @@
 ---
 title: "Configuration"
 description: "Every hybrids3 config.yaml setting: master key, cleanup interval, lock limits, path prefix and per-bucket keys, visibility, TTL and size limit."
-nav_order: 3
 ---
 
 # Configuration

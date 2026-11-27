@@ -127,8 +127,20 @@ cmd_get() {
 cmd_info() {
 	[[ $# -ge 2 ]] || die "info needs: <bucket> <key>"
 	log INFO "info bucket=$1 key=$2"
-	# HEAD → headers are the payload the user wants; emit to stdout.
-	curl -sI "${auth_args[@]}" "$HYBRIDS3_URL/$1/$2"
+	# HEAD → headers are the payload the user wants; emit to stdout on 2xx.
+	local headers code
+	headers="$(mktemp)"
+	# shellcheck disable=SC2064  # expand $headers now so the trap removes THIS temp file
+	trap "rm -f '$headers'" RETURN
+	code="$(curl -sI -o "$headers" -w '%{http_code}' "${auth_args[@]}" \
+		"$HYBRIDS3_URL/$1/$2")" || code=000
+	if [[ "$code" =~ ^2[0-9][0-9]$ ]]; then
+		cat "$headers"
+		return 0
+	fi
+	log ERROR "request failed http=$code"
+	cat "$headers" >&2 || true # intentional: the headers are diagnostics, the exit code carries the failure
+	return "$EXIT_HTTP_FAIL"
 }
 
 cmd_list() {

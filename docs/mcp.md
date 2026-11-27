@@ -1,7 +1,6 @@
 ---
 title: "MCP server"
 description: "Connect AI agents to hybrids3 over MCP Streamable HTTP at /mcp/: client setup, connection and per-tool auth, and every tool with its arguments and results."
-nav_order: 7
 ---
 
 # MCP server

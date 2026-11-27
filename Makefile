@@ -18,9 +18,11 @@ TEST_TAG   := $(TAG)-test
 DEV_IMAGE  := psyb0t/hybrids3-dev:latest
 
 # ── Docs site ────────────────────────────────────────────────────────────────
-# The image GitHub Pages builds with, pinned by digest. Output is gitignored.
-DOCS_IMAGE := ghcr.io/actions/jekyll-build-pages:v1.0.13@sha256:6791ebfd912185ed59bfb5fb102664fa872496b79f87ff8b9cfba292a7345041
-DOCS_SITE  := .testing/docs-site
+# Docusaurus builds docs/ into website/build (gitignored). The Node image is
+# pinned by digest; pnpm refuses packages younger than the age gate in
+# website/pnpm-workspace.yaml.
+DOCS_NODE_IMAGE := node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
+DOCS_CACHE      := .testing/docs-cache
 
 # ── Supply-chain ─────────────────────────────────────────────────────────────
 PYPROJECT  := pyproject.toml
@@ -39,7 +41,7 @@ DEV_RUN := docker run --rm \
 .PHONY: help all dev-image shell \
 	pkg-lock pkg-add pkg-remove pkg-update pkg-upgrade \
 	lint format test-unit test \
-	build run stop logs clean docs
+	build run stop logs clean docs docs-build docs-lock
 
 all: help
 
@@ -109,17 +111,24 @@ test: build test-unit ## Build prod image + run unit tests + run integration sui
 
 # ── Docs site ────────────────────────────────────────────────────────────────
 
-docs: ## Build the docs/ site with the GitHub Pages image (output is gitignored)
-	@mkdir -p $(DOCS_SITE)
-	docker run --rm \
-		-u $(UID):$(GID) -e HOME=/tmp \
-		-e GITHUB_WORKSPACE=/work \
-		-e GITHUB_REPOSITORY=psyb0t/docker-hybrids3 \
-		-e INPUT_SOURCE=docs \
-		-e INPUT_DESTINATION=$(DOCS_SITE) \
-		-e INPUT_VERBOSE=false \
-		-v $(PWD):/work \
-		$(DOCS_IMAGE)
+DOCS_RUN := docker run --rm --init --cap-drop ALL --security-opt no-new-privileges:true \
+	--user $(UID):$(GID) -e HOME=/tmp -e COREPACK_HOME=/cache/corepack \
+	-v "$(CURDIR)/$(DOCS_CACHE):/cache" \
+	-v "$(CURDIR)/docs:/work/docs:ro" -v "$(CURDIR)/website:/work/website" -w /work/website
+
+docs: docs-build ## Build the documentation site into website/build
+
+# The install step downloads the locked packages; the build itself runs with
+# no network, and fails on a broken link or anchor.
+docs-build: | $(DOCS_CACHE)
+	$(DOCS_RUN) $(DOCS_NODE_IMAGE) corepack pnpm install --frozen-lockfile --ignore-scripts --store-dir /cache/pnpm
+	$(DOCS_RUN) --network none $(DOCS_NODE_IMAGE) corepack pnpm run build
+
+docs-lock: | $(DOCS_CACHE) ## Refresh website/pnpm-lock.yaml from website/package.json
+	$(DOCS_RUN) $(DOCS_NODE_IMAGE) corepack pnpm install --lockfile-only --ignore-scripts --store-dir /cache/pnpm
+
+$(DOCS_CACHE):
+	mkdir -p "$@"
 
 # ── Production image ─────────────────────────────────────────────────────────
 

@@ -1,10 +1,7 @@
 ---
 title: "Home"
 description: "hybrids3 is a self-hosted object storage container that answers boto3 and AWS SDKs, curl with Bearer tokens, and AI agents over MCP on one port."
-nav_order: 1
-permalink: /
-seo:
-  type: WebSite
+slug: /
 ---
 
 # HybridS3

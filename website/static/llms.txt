@@ -1,0 +1,19 @@
+# HybridS3
+
+> A single-container object storage server with an S3-compatible API, a plain HTTP API with Bearer tokens and an MCP server, backed by SQLite metadata and flat files.
+
+- [HybridS3](https://psyb0t.github.io/docker-hybrids3/): hybrids3 is a self-hosted object storage container that answers boto3 and AWS SDKs, curl with Bearer tokens, and AI agents over MCP on one port.
+- [Running the container](https://psyb0t.github.io/docker-hybrids3/deployment/): Run the psyb0t/hybrids3 image with docker run or Compose: tags, the config and data mounts, UID 1000 ownership, health checks, upgrades and backups.
+- [Configuration](https://psyb0t.github.io/docker-hybrids3/configuration/): Every hybrids3 config.yaml setting: master key, cleanup interval, lock limits, path prefix and per-bucket keys, visibility, TTL and size limit.
+- [Keys and access](https://psyb0t.github.io/docker-hybrids3/keys-and-access/): How hybrids3 authenticates: per-bucket private and public keys, the cross-bucket master key, public versus private buckets, and the 404 for hidden buckets.
+- [HTTP API](https://psyb0t.github.io/docker-hybrids3/http-api/): Every hybrids3 HTTP route with its auth, query parameters, response headers, status codes, JSON and XML error formats and error codes.
+- [S3 API](https://psyb0t.github.io/docker-hybrids3/s3-api/): Use boto3, aws-cli or any AWS SDK with hybrids3: Signature V4 credentials, supported S3 operations, listing limits and operations that are missing.
+- [MCP server](https://psyb0t.github.io/docker-hybrids3/mcp/): Connect AI agents to hybrids3 over MCP Streamable HTTP at /mcp/: client setup, connection and per-tool auth, and every tool with its arguments and results.
+- [Presigned URLs](https://psyb0t.github.io/docker-hybrids3/presigned-urls/): Hand out time-limited hybrids3 links that let someone download or upload one object without a key, from the HTTP endpoint, the MCP tool or boto3.
+- [Storage, expiry and locking](https://psyb0t.github.io/docker-hybrids3/storage/): How hybrids3 stores objects: atomic writes, MIME type detection, TTL expiry, the cleanup loop for orphan files, and the per-object read-write locks.
+- [Behind a reverse proxy](https://psyb0t.github.io/docker-hybrids3/reverse-proxy/): Serve hybrids3 under a path prefix behind nginx without breaking AWS Signature V4, and get https presigned URLs with FORWARDED_ALLOW_IPS.
+- [Agent integrations](https://psyb0t.github.io/docker-hybrids3/agent-integrations/): Install the hybrids3 agent skill and plugins in Claude Code, Codex and OpenClaw, and use the stdio MCP bridge for clients without remote MCP support.
+- [Security](https://psyb0t.github.io/docker-hybrids3/security/): What hybrids3 protects, what it stores, the gaps to know about, and the checklist to work through before exposing it beyond localhost.
+- [Troubleshooting](https://psyb0t.github.io/docker-hybrids3/troubleshooting/): Read hybrids3 JSON logs, fix each startup error, and track down 404s, 503s, signature mismatches, wrong content types and failed SDK calls.
+- [Architecture](https://psyb0t.github.io/docker-hybrids3/architecture/): How hybrids3 is built: the FastAPI app and its middlewares, the modules in app/, the path of an upload and how HTTP, S3 and MCP share one store.
+- [Development](https://psyb0t.github.io/docker-hybrids3/development/): Work on hybrids3: the sandboxed dev container, make targets for lint and tests, the integration suite, dependency changes, CI and how releases are cut.

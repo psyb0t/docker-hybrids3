@@ -1,7 +1,6 @@
 ---
 title: "Development"
 description: "Work on hybrids3: the sandboxed dev container, make targets for lint and tests, the integration suite, dependency changes, CI and how releases are cut."
-nav_order: 15
 ---
 
 # Development
@@ -79,10 +78,11 @@ Do not run `uv` by hand. Every supported change has a target, so the gate and th
 
 ## Documentation
 
-The site you are reading is [`docs/`](https://github.com/psyb0t/docker-hybrids3/tree/main/docs), built by GitHub Pages with Jekyll and the Just the Docs theme. Build it locally with the same image GitHub uses:
+The site you are reading is [`docs/`](https://github.com/psyb0t/docker-hybrids3/tree/main/docs), built with Docusaurus, which the docs workflow publishes to GitHub Pages. The site setup is in [`website/`](https://github.com/psyb0t/docker-hybrids3/tree/main/website). Build it locally in a pinned Node container; the build fails on a broken link:
 
 ```bash
-make docs   # build the site into a gitignored output directory
+make docs        # build the site into website/build, gitignored
+make docs-lock   # refresh website/pnpm-lock.yaml after changing website/package.json
 ```
 
 ## CI

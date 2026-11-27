@@ -1,7 +1,6 @@
 ---
 title: "Architecture"
 description: "How hybrids3 is built: the FastAPI app and its middlewares, the modules in app/, the path of an upload and how HTTP, S3 and MCP share one store."
-nav_order: 14
 ---
 
 # Architecture

@@ -1,7 +1,6 @@
 ---
 title: "Security"
 description: "What hybrids3 protects, what it stores, the gaps to know about, and the checklist to work through before exposing it beyond localhost."
-nav_order: 12
 ---
 
 # Security

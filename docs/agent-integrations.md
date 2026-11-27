@@ -1,7 +1,6 @@
 ---
 title: "Agent integrations"
 description: "Install the hybrids3 agent skill and plugins in Claude Code, Codex and OpenClaw, and use the stdio MCP bridge for clients without remote MCP support."
-nav_order: 11
 ---
 
 # Agent integrations

@@ -1,7 +1,6 @@
 ---
 title: "Storage, expiry and locking"
 description: "How hybrids3 stores objects: atomic writes, MIME type detection, TTL expiry, the cleanup loop for orphan files, and the per-object read-write locks."
-nav_order: 9
 ---
 
 # Storage, expiry and locking

@@ -30,11 +30,11 @@ jobs:
       contents: write
     uses: psyb0t/reusable-github-workflows/.github/workflows/create-badges.yml@master
 
-  # The called workflow builds only on main/master or tags, so other branches
-  # stop after the code job.
-  call-docker-image-workflow:
+  # Only a push to the default branch builds the image; other branches stop
+  # after the code job.
+  docker:
     needs: [code]
-    if: "!startsWith(github.ref, 'refs/tags/')"
+    if: "!startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && github.ref_name == github.event.repository.default_branch"
     permissions:
       contents: write # GitHub Release
       security-events: write # upload the Grype SARIF to the Security tab
@@ -47,6 +47,8 @@ jobs:
       # Report scan findings to the Security tab without failing the run, so
       # a tag release can still promote this build.
       scan_fail_build: false
+      dockerhub_private: false
+      sync_description: true
     secrets:
       dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
       dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -72,7 +74,9 @@ jobs:
       promote_on_tag: true
       # The release job below cuts the release from the tag's own notes.
       create_release: false
-      scan_fail_build: false
+      # The main run already scanned this digest and set the description.
+      scan_enabled: false
+      sync_description: false
     secrets:
       dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
       dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -95,6 +99,10 @@ jobs:
     with:
       skill_names: '["hybrids3"]'
       plugin_names: '["hybrids3"]'
+      # The skill names psyb0t/hybrids3 and fetches config.example.yaml from
+      # main; the published copy gets the release image and the release tag.
+      pin_images: '["psyb0t/hybrids3"]'
+      pin_source_urls: true
     secrets:
       clawhub_token: ${{ secrets.CLAWHUB_TOKEN }}
 

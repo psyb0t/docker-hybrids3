@@ -9,7 +9,7 @@ Besides the [MCP server](mcp.md) built into the container, the repository ships 
 
 ## The skill
 
-The skill lives in [`.agents/skills/hybrids3/`](https://github.com/psyb0t/docker-hybrids3/tree/main/.agents/skills/hybrids3): the instructions in `SKILL.md`, a setup reference in `references/setup.md` and `scripts/hybrids3.sh`, a curl wrapper with `put`, `get`, `info`, `list`, `delete`, `buckets`, `presign` and `health` commands. Any agent that reads `.agents/skills/`, such as [peen](https://github.com/psyb0t/peen), picks it up from a checkout of this repository.
+The skill lives in [`.agents/skills/hybrids3/`](https://github.com/psyb0t/docker-hybrids3/tree/main/.agents/skills/hybrids3): the instructions in `SKILL.md` and `scripts/hybrids3.sh`, a curl wrapper with `put`, `get`, `info`, `list`, `delete`, `buckets`, `presign` and `health` commands. Any agent that reads `.agents/skills/`, such as [peen](https://github.com/psyb0t/peen), picks it up from a checkout of this repository.
 
 It reads these environment variables:
 

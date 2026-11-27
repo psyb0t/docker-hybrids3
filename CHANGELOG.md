@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.3.12], 2026-11-27
+
+- The agent skill now covers only using a hybrids3 server that is already running: the S3 API, the plain HTTP API, the MCP tools and the `scripts/hybrids3.sh` helper. Install and deployment steps are out of the skill and stay in the [documentation](https://psyb0t.github.io/docker-hybrids3/). `references/setup.md` is removed.
+- The ClawHub publish job no longer sets `pin_images` or `pin_source_urls`, so publishing no longer rewrites the skill's image reference or links to the release.
+- The agent-surface and security rules now say the skill covers use of the running server, links the docs for setup and carries no deployment examples.
+
 ## [v0.3.11], 2026-11-27
 
 - The agent skill now says where data goes and what cannot be undone. Requests go only to the host in `HYBRIDS3_URL`, which receives the keys and the object bytes, so anything beyond localhost should use `https://` through a TLS proxy. It describes deletes and overwrites as irreversible and limits them to the key the user named. Its frontmatter declares the network, shell and filesystem use.

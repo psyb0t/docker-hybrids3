@@ -99,10 +99,6 @@ jobs:
     with:
       skill_names: '["hybrids3"]'
       plugin_names: '["hybrids3"]'
-      # The skill names psyb0t/hybrids3 and fetches config.example.yaml from
-      # main; the published copy gets the release image and the release tag.
-      pin_images: '["psyb0t/hybrids3"]'
-      pin_source_urls: true
     secrets:
       clawhub_token: ${{ secrets.CLAWHUB_TOKEN }}
 

@@ -56,7 +56,7 @@ Request path for an upload: client -> `RequestIdMiddleware` -> `McpAuthMiddlewar
 | `tests/test_lock_unit.py` | pytest unit tests for `app/lock.py` |
 | `docs/` | The documentation pages |
 | `website/` | The Docusaurus site that builds `docs/` for GitHub Pages |
-| `.agents/skills/hybrids3/` | The agent skill, its `references/setup.md` and the `scripts/hybrids3.sh` curl helper |
+| `.agents/skills/hybrids3/` | The agent skill and the `scripts/hybrids3.sh` curl helper |
 | `.agents/plugins/hybrids3/` | The OpenClaw stdio-to-HTTP MCP bridge plugin (MIT) |
 | `.agents/.claude-plugin/`, `.agents/.codex-plugin/` | Claude Code and Codex plugin manifests |
 | `.agents/rules/` | Rules for changing this repository |

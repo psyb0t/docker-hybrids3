@@ -1,34 +1,31 @@
 ---
 name: hybrids3
-description: "Self-hosted lightweight object storage speaking three interfaces at once: the S3 API (boto3 / AWS-SDK compatible, AWS Sig V4), a plain HTTP API (curl-friendly, Bearer auth), and MCP (Streamable HTTP tools for agents). Buckets/objects with SQLite metadata and flat-file storage on disk; buckets are config-defined (no create/delete API), each with a public/private flag, a private key + public key pair, optional TTL expiry, and a max upload size. Auth is per-bucket keys plus a cross-bucket master key; presigned GET/PUT URLs for handing out single-object access. Use when the user wants to put/get/list/delete files in a self-hosted S3-compatible store, generate presigned upload/download links, drive their own boto3-compatible object storage, or connect an agent to object storage over MCP. Also covers running a local instance with Docker."
+description: "Self-hosted lightweight object storage speaking three interfaces at once: the S3 API (boto3 / AWS-SDK compatible, AWS Sig V4), a plain HTTP API (curl-friendly, Bearer auth), and MCP (Streamable HTTP tools for agents). Buckets/objects with SQLite metadata and flat-file storage on disk; buckets are config-defined (no create/delete API), each with a public/private flag, a private key + public key pair, optional TTL expiry, and a max upload size. Auth is per-bucket keys plus a cross-bucket master key; presigned GET/PUT URLs for handing out single-object access. Use when the user wants to put/get/list/delete files in a self-hosted S3-compatible store, generate presigned upload/download links, drive their own boto3-compatible object storage, or connect an agent to object storage over MCP."
 homepage: https://github.com/psyb0t/docker-hybrids3
 user-invocable: true
 permissions:
-  network: "HTTP(S) requests to the user-provided HYBRIDS3_URL only. Requests carry the bucket key or master key in an Authorization header (or as an MCP auth_key argument) plus the object bytes being uploaded or downloaded. Use https:// for any non-loopback URL. Docker pulls psyb0t/hybrids3 from Docker Hub when the user sets up a local instance."
-  shell: "curl and the bundled scripts/hybrids3.sh helper against HYBRIDS3_URL. The optional local-instance setup uses docker run or docker compose, and the optional MCP setup uses claude mcp add."
-  filesystem: "Reads local files the user names for upload and writes downloads to the output path the user names. The helper appends log lines to /tmp/hybrids3.log (LOG_FILE). Local-instance setup writes a config.yaml in the directory the user chooses."
+  network: "HTTP(S) requests to the user-provided HYBRIDS3_URL only. Requests carry the bucket key or master key in an Authorization header (or as an MCP auth_key argument) plus the object bytes being uploaded or downloaded. Use https:// for any non-loopback URL."
+  shell: "curl and the bundled scripts/hybrids3.sh helper against HYBRIDS3_URL."
+  filesystem: "Reads local files the user names for upload and writes downloads to the output path the user names. The helper appends log lines to /tmp/hybrids3.log (LOG_FILE)."
 metadata:
-  { "openclaw": { "emoji": "🪣", "primaryEnv": "HYBRIDS3_URL", "requires": { "bins": ["docker", "curl"] } } }
+  { "openclaw": { "emoji": "🪣", "primaryEnv": "HYBRIDS3_URL", "requires": { "bins": ["curl"] } } }
 ---
 
 # hybrids3
 
 Lightweight object storage that speaks three interfaces from one container: the **S3 API** (boto3 / any AWS SDK, AWS Signature V4), a **plain HTTP API** (`curl` + Bearer token), and **MCP** (Streamable HTTP tool definitions for AI agents). Metadata lives in SQLite, object bytes are flat files on disk.
 
-Buckets are **configuration, not state**. They're defined in the server's `config.yaml` and there is no API to create or delete them. Each bucket carries: a `public`/private flag, a private `key` (Bearer token + S3 signing secret), a `public_key` (the `aws_access_key_id` identifier), an optional `ttl` (objects auto-expire after last write), and an optional `max_file_size`. A single cross-bucket `master_key` operates on every bucket and is the only credential that can list all buckets.
+Buckets are **configuration, not state**. They're defined in the server's configuration and there is no API to create or delete them. Each bucket carries: a `public`/private flag, a private `key` (Bearer token + S3 signing secret), a `public_key` (the `aws_access_key_id` identifier), an optional `ttl` (objects auto-expire after last write), and an optional `max_file_size`. A single cross-bucket `master_key` operates on every bucket and is the only credential that can list all buckets.
 
 Object keys support nested paths (`reports/2024/jan.pdf`). Content type is auto-detected on upload (libmagic sniff + extension fallback). Presigned GET/PUT URLs hand out time-limited single-object access without exposing a key.
-
-For installation, configuration, and container setup, see [references/setup.md](references/setup.md).
 
 ## Security & safety
 
 - **Public buckets need no auth for reads.** A bucket with `public: true` serves `GET`/`HEAD`/`LIST` to anyone who can reach the port. Store only data meant to be openly readable there; keep sensitive data in a `public: false` bucket.
-- **Bind loopback, not all interfaces.** The container listens on `8080`. Publishing it as `-p 8080:8080` / compose `"8080:8080"` makes it reachable from the network. Use `-p 127.0.0.1:8080:8080` unless remote access is intended, and for real deployments put the service on an internal Docker network behind a TLS reverse proxy. See [references/setup.md](references/setup.md#quick-install) and [Behind a Reverse Proxy](references/setup.md#behind-a-reverse-proxy).
 - **Deletes and overwrites are irreversible.** `DELETE`, S3 `delete_object`, MCP `delete_object`, the helper's `delete` command, and a `PUT` or presigned `PUT` onto an existing key have no undo, no versioning and no recycle bin. Act only on the bucket and key the task owns, and only when the user asked for that specific delete or overwrite. Do not list objects and then delete them in bulk.
 - **Where data goes.** Every request goes to the host in `HYBRIDS3_URL` and nowhere else. That host receives the object bytes, the bucket key or master key (in the `Authorization` header, or as the MCP `auth_key` argument), and the object keys. hybrids3 speaks plain HTTP, so use `http://` only for `localhost` or a protected internal network, and `https://` through a TLS proxy for anything else.
-- **Keys and presigned URLs are bearer credentials.** Whoever holds a bucket `key`, the `master_key` or a live presigned URL can act as that bucket (or the master) until the key is rotated or the URL expires. There is no per-caller revocation. Do not print them, log them or paste them into shared prompts, and hand a presigned URL only to the one recipient it is for. Read keys from the environment variables below, never from the server's `config.yaml`.
-- **This skill is a consumer, not an operator.** It talks to an instance the user already runs. Do not reconfigure `config.yaml`, change bucket visibility or alter port bindings unless the user asks.
+- **Keys and presigned URLs are bearer credentials.** Whoever holds a bucket `key`, the `master_key` or a live presigned URL can act as that bucket (or the master) until the key is rotated or the URL expires. There is no per-caller revocation. Do not print them, log them or paste them into shared prompts, and hand a presigned URL only to the one recipient it is for. Read keys from the environment variables below, never by reading the server's configuration files.
+- **This skill is a consumer, not an operator.** It talks to an instance the user already runs. Do not change bucket configuration or visibility unless the user asks.
 
 ## When To Use
 
@@ -42,36 +39,23 @@ For installation, configuration, and container setup, see [references/setup.md](
 
 ## When NOT To Use
 
-- Creating or deleting buckets at runtime. Buckets live in `config.yaml`; add/remove them there and restart. `PUT /{bucket}` is an S3-compat no-op.
+- Creating or deleting buckets at runtime. Buckets are server configuration; there is no API for them. `PUT /{bucket}` is an S3-compat no-op.
 - Multipart / chunked uploads (S3's multipart protocol): not implemented. Upload the whole object in one request.
 - Object versioning, ACLs beyond bucket-level public/private, replication, or encryption at rest: none are supported.
 - Downloading objects **over 50 MB via MCP**: the MCP `download_object` tool caps at 50 MB. Use the S3 or plain HTTP `GET` for large objects.
-- CORS from a browser: no CORS headers are emitted; add them at the reverse-proxy layer.
+- CORS from a browser: the server emits no CORS headers.
 - Provisioning, configuring, or hardening the server itself. This skill is a **consumer**. It talks to an instance the user already runs and trusts.
 
 ## Setup
 
-The container should already be running. Point the skill at it:
+hybrids3 must already be installed and running; for that, see the docs at https://psyb0t.github.io/docker-hybrids3/. This skill reads the connection values from the environment the user set:
 
-```bash
-export HYBRIDS3_URL=http://localhost:8080   # use https:// for any non-loopback host
-```
+- `HYBRIDS3_URL`: base URL of the instance (include any path prefix, e.g. `http://host/storage`; every route, health included, lives under it). Use `https://` for any non-loopback host.
+- `HYBRIDS3_KEY`: the bucket private key (Bearer token / `aws_secret_access_key`).
+- `HYBRIDS3_PUBLIC_KEY`: the bucket public key (`aws_access_key_id`, defaults to the bucket name).
+- `HYBRIDS3_MASTER_KEY` and `HYBRIDS3_MASTER_PUBLIC_KEY` (defaults to `master`): only for cross-bucket / list-all-buckets operations.
 
 **Verify:** `curl $HYBRIDS3_URL/health` returns `{"status":"ok"}`.
-
-Keys are per-bucket and come from the operator's `config.yaml`. Export the ones you'll use rather than pasting them inline:
-
-```bash
-export HYBRIDS3_KEY=<bucket-private-key>          # Bearer token / aws_secret_access_key
-export HYBRIDS3_PUBLIC_KEY=<bucket-public-key>    # aws_access_key_id (defaults to bucket name)
-# For cross-bucket / list-all-buckets operations, use the master credentials instead:
-export HYBRIDS3_MASTER_KEY=<master-key>
-export HYBRIDS3_MASTER_PUBLIC_KEY=<master-public-key>   # defaults to "master"
-```
-
-If the server runs behind a reverse proxy at a subpath, `HYBRIDS3_URL` includes it (e.g. `http://host/storage`) and every route, health included, lives under that prefix.
-
-For install / `config.yaml` shape / bucket + key definitions / ports / reverse proxy, see [references/setup.md](references/setup.md).
 
 ## Three Access Modes
 
@@ -240,15 +224,6 @@ An MCP server runs at `POST /mcp/` over the **Streamable HTTP** transport. Clien
 }
 ```
 
-Wire it into Claude Code:
-
-```bash
-claude mcp add --transport http hybrids3 "$HYBRIDS3_URL/mcp/"
-# with endpoint-level auth:
-claude mcp add --transport http hybrids3 "$HYBRIDS3_URL/mcp/" \
-  --header "Authorization: Bearer $HYBRIDS3_MASTER_KEY"
-```
-
 ### Auth (two layers)
 
 **Endpoint-level (optional)**: a token that authenticates the *connection* before any tool runs. Any valid key (master or bucket) is accepted; it does not grant or limit anything inside the tools, which per-tool auth decides. Send it as `Authorization: Bearer <key>`, or (for clients that can't set headers) as `?auth=<key>` on the URL, which puts the key in URLs and proxy logs, so prefer the header. A token that matches nothing → `401`; **no token → passes through**, and per-tool auth applies. When the server sets `path_prefix`, the token check is skipped entirely.
@@ -369,8 +344,8 @@ Point any existing boto3 code at `HYBRIDS3_URL`, set the bucket's `public_key`/`
 
 ### Agent-driven storage over MCP
 
-Add the server (`claude mcp add --transport http hybrids3 "$HYBRIDS3_URL/mcp/"`), then call `list_buckets` to discover buckets, `upload_object` / `download_object` / `list_objects` to move data. Pass the bucket `key` as `auth_key`; use the master key only when you need cross-bucket reach.
+With the MCP server connected at `$HYBRIDS3_URL/mcp/`, call `list_buckets` to discover buckets, `upload_object` / `download_object` / `list_objects` to move data. Pass the bucket `key` as `auth_key`; use the master key only when you need cross-bucket reach.
 
 ### Auto-expiring scratch storage
 
-If a bucket has a `ttl` set (server config), objects delete themselves that long after their last write; overwriting resets the clock. Nothing to do client-side; just write to the bucket.
+If a bucket has a `ttl` set, objects delete themselves that long after their last write; overwriting resets the clock. Nothing to do client-side; just write to the bucket.

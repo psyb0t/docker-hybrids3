@@ -2,7 +2,7 @@
 
 Applies to `.agents/skills/`, `.agents/plugins/`, `.agents/.claude-plugin/`, `.agents/.codex-plugin/`, `server.json` and `glama.json`.
 
-- The skill (`.agents/skills/hybrids3/SKILL.md`, `references/setup.md`, `scripts/hybrids3.sh`) is a consumer of a server the user already runs. It must not tell an agent to edit `config.yaml`, change bucket visibility or expose ports unless the user asks.
+- The skill (`.agents/skills/hybrids3/SKILL.md` and `scripts/hybrids3.sh`) covers using a server the user already runs. It links the docs for setup, states its safety guardrails once and does not document the installer or deployment. It must not tell an agent to edit `config.yaml`, change bucket visibility or expose ports unless the user asks.
 - Keep the destructive-operation guardrails next to every `DELETE`, `delete_object` and presigned `PUT` in the skill.
 - Every route, tool, argument, default and limit named in the skill must match the code and the docs site. Fix both when either changes.
 - `scripts/hybrids3.sh` prints its own header comment (lines 2 to 30) as help text. Keep the usage block inside those lines when editing it.
